@@ -62,5 +62,5 @@ handlers.getServerDataTest = function (args, context){
     
     var array = json.array;
     
-    return { result: typeof(array) };
+    return { result: array };
 };
