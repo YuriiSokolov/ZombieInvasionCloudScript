@@ -17,6 +17,26 @@ function getRandomInt(max) {
   return Math.floor(Math.random() * Math.floor(max));
 }
 
+function getRandomIntWithoutNumbers(numbers, max){
+    var result = getRandomInt(max);
+    
+    var flag = 0;
+    
+    do{
+        flag = 0;
+        
+        for(let i = 0; i < numbers.length; i++){
+            if(result == numbers[i]){
+                flag++;
+                break;
+            }
+        }
+        result = getRandomInt(max);
+    }while(flag != 0);
+    
+    return result;
+}
+
 function sumArray(array){
     var sum = 0;
     
@@ -62,5 +82,54 @@ handlers.getServerDataTest = function (args, context){
     
     var array = json.array;
     
-    return { result: array };
+    return { result: getTitleData };
+};
+
+function getPlayerData(playFabId, key){
+    var getPlayerDataRequest = {"Keys": [key], "PlayFabId": playFabId}
+    
+    var playerData = server.GetUserData(getPlayerDataRequest);
+    
+    return playerData;
+}
+
+handlers.getPlayerForSabotage = function (args, context){
+    var randomPlayfabId;
+    var randomPlayerGold;
+    var randomPlayerName;
+    var randomPlayerFort;
+    
+    var getLeaderboardAroundPlayerRequest = { "MaxResultsCount" : 100, "StatisticName" : "gold", "PlayFabId" : currentPlayerId };
+    
+    var leaderBoardAroundPlayer = server.GetLeaderboard(getLeaderboardAroundPlayerRequest);
+    
+    var playerCount = leaderBoardAroundPlayer.Leaderboard.length;
+    
+    var randomPlayerIndex = getRandomInt(playerCount);
+    
+    var badPlayersIndexs = [];
+    
+    if(playerCount > 1){
+        while(true){
+            if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId != currentPlayerId){
+                randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
+                break;
+            }
+            else{
+                badPlayersIndexs.push(randomPlayerIndex);
+                randomPlayerIndex = getRandomIntWithoutNumbers(badPlayersIndexs, playerCount);
+            }
+        }
+    }
+    else{
+        return { result: null };
+    }
+    
+    randomPlayerGold = JSON.parse(getPlayerData(randomPlayfabId, "playerStats").Data.playerStats.Value).coins;
+    
+    randomPlayerName = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId }).UserInfo.TitleInfo.DisplayName;
+    
+    randomPlayerFort = JSON.parse(getPlayerData(randomPlayfabId, "forts").Data.forts.Value);
+    
+    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[0] } };
 };
