@@ -131,5 +131,76 @@ handlers.getPlayerForSabotage = function (args, context){
     
     randomPlayerFort = JSON.parse(getPlayerData(randomPlayfabId, "forts").Data.forts.Value);
     
-    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[0] } };
+    updatePlayerInternalData(randomPlayfabId, currentPlayerId, { gold : randomPlayerGold });
+    
+    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[0]} };
 };
+
+handlers.stealMoneyFromPlayer = function (args, context){
+    var randomPlayfabId = "48FEB5A66EE09B0E";
+    var userInternalData = server.GetUserInternalData({ Keys: [currentPlayerId], PlayFabId : randomPlayfabId });
+    var goldBeforeSteal = JSON.parse(userInternalData.Data[currentPlayerId].Value).gold;
+    var maxStealGold = Math.floor(0.25 * goldBeforeSteal);
+    var gold;
+    var userData = server.GetUserData({Keys: ["playerStats"], PlayFabId : randomPlayfabId});
+    var userStats;
+    
+    if(args){
+        if(args.playFabId && args.gold){
+            randomPlayfabId = args.playFabId;
+            gold = args.gold;
+            
+            userInternalData = server.GetUserInternalData({ Keys: [currentPlayerId], PlayFabId : randomPlayfabId });
+            
+            goldBeforeSteal = JSON.parse(userInternalData.Data[currentPlayerId].Value).gold;
+            maxStealGold = Math.floor(0.25 * goldBeforeSteal);
+            
+            if(gold <= maxStealGold){
+                userData = server.GetUserData({Keys: ["playerStats"], PlayFabId : randomPlayfabId});
+                userStats = JSON.parse(userData.Data.playerStats.Value);
+                
+                if(userStats.coins >= gold){
+                    userStats.coins -= gold;
+                }
+                else{
+                    userStats.coins = 0;
+                }
+                
+                userData = updatePlayerData(randomPlayfabId, "playerStats", userStats);
+                
+                var statsCoins = 0;
+                statsCoins = userStats.coins;
+                
+                server.UpdatePlayerStatistics({PlayFabId : randomPlayfabId, Statistics: [{"StatisticName" : "gold", "Value" : statsCoins}]});
+                
+                updatePlayerInternalData(randomPlayfabId, currentPlayerId, null);
+            }
+        }
+    }
+    
+    return {result : userData};
+}
+
+function updatePlayerData(playFabId, key, value){
+    var playerData = {};
+    playerData[new String(key)] = JSON.stringify(value);
+    var result = server.UpdateUserData({PlayFabId : playFabId, Data : playerData});
+    
+    return result;
+}
+
+function updatePlayerInternalData(playFabId, key, value){
+    var playerData = {};
+    
+    if(value == null){
+        playerData[new String(key)] = null;
+    }
+    else{
+        playerData[new String(key)] = JSON.stringify(value);
+    }
+    
+    var updatePlayerInternalDataRequest = { PlayFabId : playFabId , Data : playerData };
+    var result = server.UpdateUserInternalData(updatePlayerInternalDataRequest);
+    
+    return result;
+}
