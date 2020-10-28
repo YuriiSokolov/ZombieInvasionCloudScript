@@ -73,16 +73,16 @@ handlers.getSpinThingID = function (args, context){
     return { result: thingID };
 };
 
-handlers.getServerDataTest = function (args, context){
-    var getTitleDataRequest ={ "Keys": ["jsonTest"] };
+function getServerData (key){
+    return server.GetTitleInternalData({ "Keys": [new String(key)] });
+};
+
+function getServerDataAsObject (key){
+    var getTitleData = server.GetTitleInternalData({ "Keys": [new String(key)] });
     
-    var getTitleData = server.GetTitleInternalData(getTitleDataRequest);
+    var value = JSON.parse(getTitleData.Data[new String(key)]);
     
-    var json = JSON.parse(getTitleData.Data.jsonTest);
-    
-    var array = json.array;
-    
-    return { result: getTitleData };
+    return value;
 };
 
 function getPlayerData(playFabId, key){
@@ -137,12 +137,12 @@ handlers.getPlayerForSabotage = function (args, context){
 };
 
 handlers.stealMoneyFromPlayer = function (args, context){
-    var randomPlayfabId = "48FEB5A66EE09B0E";
-    var userInternalData = server.GetUserInternalData({ Keys: [currentPlayerId], PlayFabId : randomPlayfabId });
-    var goldBeforeSteal = JSON.parse(userInternalData.Data[currentPlayerId].Value).gold;
-    var maxStealGold = Math.floor(0.25 * goldBeforeSteal);
+    var randomPlayfabId;
+    var userInternalData;
+    var goldBeforeSteal;
+    var maxStealGold;
     var gold;
-    var userData = server.GetUserData({Keys: ["playerStats"], PlayFabId : randomPlayfabId});
+    var userData;
     var userStats;
     
     if(args){
@@ -201,6 +201,79 @@ function updatePlayerInternalData(playFabId, key, value){
     
     var updatePlayerInternalDataRequest = { PlayFabId : playFabId , Data : playerData };
     var result = server.UpdateUserInternalData(updatePlayerInternalDataRequest);
+    
+    return result;
+}
+
+handlers.getDailyChallenges = function (args, context){
+    var dailyQuestsList = getServerDataAsObject("DailyQuests");
+    
+    var userDailyQuestsResult = server.GetUserReadOnlyData({PlayFabId : currentPlayerId, Keys : ["dailyChallenges"]});
+    
+    var userDailyQuests;
+    
+    var playerData;
+    
+    try{
+        log.debug("after JSON");
+        userDailyQuests = JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value);
+        log.debug("before JSON");
+        
+        playerData = userDailyQuests;
+        
+        if(timeSpan(new Date(), new Date(JSON.parse(userDailyQuests.updateQuestDate))).hours >= 24){
+            log.debug(">=24");
+            userDailyQuests = getThreeQuests(dailyQuestsList);
+            playerData = {"questList" : userDailyQuests, "updateQuestDate" : JSON.stringify(new Date())};
+            updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", playerData);
+        }
+    }
+    catch{
+        log.debug("catch");
+        
+        userDailyQuests = getThreeQuests(dailyQuestsList);
+        playerData = {"questList" : userDailyQuests, "updateQuestDate" : JSON.stringify(new Date())};
+        updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", playerData);
+    }
+    
+    return { result : playerData };
+}
+
+function getThreeQuests(dailyQuestsList){
+    var threeQuests = [];
+    var badNumbers = [];
+    var randomNumber = getRandomInt(dailyQuestsList.length);
+    
+    do{
+        threeQuests.push(dailyQuestsList[randomNumber]);
+        badNumbers.push(randomNumber);
+        randomNumber = getRandomIntWithoutNumbers(badNumbers, dailyQuestsList.length);
+    }while(threeQuests.length < 3);
+    
+    return threeQuests;
+}
+
+function timeSpan(date0, date1){
+    var mseconds = Math.abs(date0 - date1);
+    var seconds = mseconds / 1000;
+    var minutes = seconds / 60;
+    var hours = minutes / 60;
+    var days = hours / 24;
+    
+    return { mseconds : mseconds, seconds : seconds, minutes : minutes, hours : hours, days : days };
+}
+
+function updatePlayerReadOnlyData(playFabId, key, value){
+    var playerData = {};
+    
+    if(value == null){
+        playerData[new String(key)] = null;
+    }
+    else{
+        playerData[new String(key)] = JSON.stringify(value);
+    }
+    
+    var result = server.UpdateUserReadOnlyData({ PlayFabId : playFabId , Data : playerData });
     
     return result;
 }
