@@ -86,11 +86,19 @@ function getServerDataAsObject (key){
 };
 
 function getPlayerData(playFabId, key){
-    var getPlayerDataRequest = {"Keys": [key], "PlayFabId": playFabId}
+    var getPlayerDataRequest = {"Keys": [key], "PlayFabId": playFabId};
     
     var playerData = server.GetUserData(getPlayerDataRequest);
     
     return playerData;
+}
+
+function getPlayerDataAsObject(playFabId, key){
+    var playerData = server.GetUserData({"Keys": [key], "PlayFabId": playFabId});
+    
+    var value = JSON.parse(playerData.Data[new String(key)].Value);
+    
+    return value;
 }
 
 handlers.getPlayerForSabotage = function (args, context){
@@ -214,16 +222,20 @@ handlers.getDailyChallenges = function (args, context){
     
     var playerData;
     
+    var questsProgress = [];
+    
     try{
-        log.debug("after JSON");
         userDailyQuests = JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value);
-        log.debug("before JSON");
         
         playerData = userDailyQuests;
+        questsProgress = getPlayerDataAsObject(currentPlayerId, "questsProgress");
+        updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
         
         if(timeSpan(new Date(), new Date(JSON.parse(userDailyQuests.updateQuestDate))).hours >= 24){
             log.debug(">=24");
             userDailyQuests = getThreeQuests(dailyQuestsList);
+            questsProgress = initQuestsProgressModel(userDailyQuests);
+            updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
             playerData = {"questList" : userDailyQuests, "updateQuestDate" : JSON.stringify(new Date())};
             updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", playerData);
         }
@@ -232,12 +244,44 @@ handlers.getDailyChallenges = function (args, context){
         log.debug("catch");
         
         userDailyQuests = getThreeQuests(dailyQuestsList);
+        questsProgress = initQuestsProgressModel(userDailyQuests);
+        updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
         playerData = {"questList" : userDailyQuests, "updateQuestDate" : JSON.stringify(new Date())};
         updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", playerData);
     }
     
     return { result : playerData };
 }
+
+handlers.getQuestReward = function (args, context){
+    var userDailyQuestsResult = server.GetUserReadOnlyData({PlayFabId : currentPlayerId, Keys : ["dailyChallenges"]});
+    var questList = JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value).questList;
+    var questsProgress = getPlayerDataAsObject(currentPlayerId, "questsProgress");
+    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    
+    if(args){
+        for(let i = 0; i < questList.length; i++){
+            if(questList[i].localizationenname == args.questName){
+                if(questsProgress[i].isComplete == true){
+                    playerData.coins += questList[i].addresourcegold;
+                    questsProgress.splice(i, 1);
+                    questList.splice(i, 1);
+                    
+                    questList = {"questList" : questList, "updateQuestDate" : JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value).updateQuestDate};
+                    
+                    updatePlayerData(currentPlayerId, "playerStats", playerData);
+                    updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
+                    updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", questList);
+                    
+                    return {result : playerData};
+                }   
+            }
+        }
+    }
+    
+    return { result: questList[0].addresourcegold, player: playerData.coins, quest : questsProgress[0].questName };
+}
+
 
 function getThreeQuests(dailyQuestsList){
     var threeQuests = [];
@@ -251,6 +295,16 @@ function getThreeQuests(dailyQuestsList){
     }while(threeQuests.length < 3);
     
     return threeQuests;
+}
+
+function initQuestsProgressModel(userDailyQuests){
+    var questsProgress = [];
+    
+    for(let i = 0; i < userDailyQuests.length; i++){
+        questsProgress.push({questName : JSON.parse(JSON.stringify(userDailyQuests[i])).localizationenname, progress : 0, isComplete : false});
+    }
+    
+    return questsProgress;
 }
 
 function timeSpan(date0, date1){
@@ -277,3 +331,61 @@ function updatePlayerReadOnlyData(playFabId, key, value){
     
     return result;
 }
+
+handlers.setArtefact = function (args, context){
+    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    
+    if(args){
+        if(args.value){
+            log.debug(args.value);
+            
+            playerData.artifacts.push(JSON.parse(args.value));
+            
+            updatePlayerData(currentPlayerId, "playerStats", playerData);
+        }
+    }
+    
+    return {result : playerData.artifacts};
+}
+
+handlers.getArtefact = function (args, context){
+    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    
+    if(args){
+        if(args.artifactID){
+            log.debug(args.artifactID);
+            
+            for(let i = 0; i < playerData.artifacts.length; i++){
+                if(playerData.artifacts[i].id == args.artifactID){
+                    playerData.artifacts.splice(i, 1);
+                    updatePlayerData(currentPlayerId, "playerStats", playerData);
+                    return {result : getPlayerData(currentPlayerId, "playerStats").Data["playerStats"].Value};
+                }
+            }
+        }
+    }
+    
+    return {result : "error"};
+}
+
+handlers.updateSave = function (args, context){
+    if(args){
+        var playerData = getPlayerDataAsObject(currentPlayerId, args.key);
+        
+        switch (args.key) {
+            case 'playerStats':
+                playerData.coins += args.gold;
+                server.UpdatePlayerStatistics({PlayFabId : currentPlayerId, Statistics: [{"StatisticName" : "gold", "Value" : args.gold}]});
+                break;
+            case 'forts':
+                break;
+            default:
+                return null;
+        }
+        
+        updatePlayerData(currentPlayerId, args.key, playerData);
+        
+        return { result : getPlayerData(currentPlayerId, args.key).Data[args.key].Value, tag : args.key};
+    }
+}
+    
