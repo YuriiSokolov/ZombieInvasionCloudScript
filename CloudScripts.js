@@ -286,12 +286,15 @@ handlers.getQuestReward = function (args, context){
 function getThreeQuests(dailyQuestsList){
     var threeQuests = [];
     var badNumbers = [];
-    var randomNumber = getRandomInt(dailyQuestsList.length);
+    var randomNumber;
     
     do{
-        threeQuests.push(dailyQuestsList[randomNumber]);
-        badNumbers.push(randomNumber);
-        randomNumber = getRandomIntWithoutNumbers(badNumbers, dailyQuestsList.length);
+        randomNumber = getRandomInt(dailyQuestsList.length);
+        
+        if(badNumbers.indexOf(randomNumber) === -1){
+            threeQuests.push(dailyQuestsList[randomNumber]);
+            badNumbers.push(randomNumber);
+        }
     }while(threeQuests.length < 3);
     
     return threeQuests;
@@ -400,6 +403,8 @@ handlers.buyUpgrade = function (args, context){
     if(building.wear == 0){
         if((playerData.coins >= costs.upgradeCost) && (building.lvl + 1 <= 5)){
             building.lvl += 1;
+            playerData.stars.fortsStars = getFortsStars(forts) + 1;
+            //server.UpdatePlayerStatistics({PlayFabId : currentPlayerId, Statistics: [{"StatisticName" : "fortStars", "Value" : playerData.stars.fortsStars}]});
             playerData.coins -= costs.upgradeCost;
         }
     }
@@ -411,6 +416,8 @@ handlers.buyUpgrade = function (args, context){
     }
 
     updatePlayerData(currentPlayerId, "forts", forts);
+    playerData.stars.fortsStars = getFortsStars(forts);
+    server.UpdatePlayerStatistics({PlayFabId : currentPlayerId, Statistics: [{"StatisticName" : "fortStars", "Value" : playerData.stars.fortsStars}]});
     updatePlayerData(currentPlayerId, "playerStats", playerData);
     
     return {result : getPlayerData(currentPlayerId, "forts").Data["forts"].Value, tag : building.name};
@@ -448,5 +455,17 @@ function getUpgradeCost(fortID, buildingID, buildingLvl){
     }
     
     return {upgradeCost : upgradeCost, repairCost : repairCost};
+}
+
+function getFortsStars(forts){
+    var stars = 0;
+    
+    for(let i = 0; i < forts.length; i++){
+        for(let j = 0; j < forts[i].buildings.length; j++){
+            stars += forts[i].buildings[j].lvl;
+        }
+    }
+    
+    return stars;
 }
     
