@@ -388,4 +388,65 @@ handlers.updateSave = function (args, context){
         return { result : getPlayerData(currentPlayerId, args.key).Data[args.key].Value, tag : args.key};
     }
 }
+
+handlers.buyUpgrade = function (args, context){
+    var forts = getPlayerDataAsObject(currentPlayerId, "forts");
+    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    
+    var building = forts[args.fortID].buildings[args.buildingID];
+        
+    var costs = getUpgradeCost(args.fortID, building.id, building.lvl);
+    
+    if(building.wear == 0){
+        if((playerData.coins >= costs.upgradeCost) && (building.lvl + 1 <= 5)){
+            building.lvl += 1;
+            playerData.coins -= costs.upgradeCost;
+        }
+    }
+    else{
+        if(playerData.coins >= costs.repairCost){
+            building.wear -= 1;
+            playerData.coins -= costs.repairCost;
+        }
+    }
+
+    updatePlayerData(currentPlayerId, "forts", forts);
+    updatePlayerData(currentPlayerId, "playerStats", playerData);
+    
+    return {result : getPlayerData(currentPlayerId, "forts").Data["forts"].Value, tag : building.name};
+}
+
+function getUpgradeCost(fortID, buildingID, buildingLvl){
+    var upgradeCosts = getServerDataAsObject("FortificationUpgrades");
+    
+    var upgradeCost;
+    var repairCost;
+    
+    for(let i = 0; i < upgradeCosts.length; i++){
+        if(upgradeCosts[i].chapter == fortID + 1){
+            
+            if(upgradeCosts[i].fortification == buildingID + 1){
+                
+                if(buildingLvl == 0){
+                    if(upgradeCosts[i].upgrade == 1){
+                        repairCost = upgradeCosts[i].payresourcegold / 2;
+                    }
+                }
+                else{
+                    if(upgradeCosts[i].upgrade == buildingLvl){
+                        repairCost = upgradeCosts[i].payresourcegold / 2;
+                    }
+                    
+                }
+                
+                if(upgradeCosts[i].upgrade == buildingLvl + 1){
+                    upgradeCost = upgradeCosts[i].payresourcegold;
+                    break;
+                }
+            }
+        }
+    }
+    
+    return {upgradeCost : upgradeCost, repairCost : repairCost};
+}
     
