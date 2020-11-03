@@ -101,6 +101,14 @@ function getPlayerDataAsObject(playFabId, key){
     return value;
 }
 
+function getPlayerReadData(playFabId, key){
+    return server.GetUserReadOnlyData({PlayFabId : playFabId, Keys : [key]});
+}
+
+function getPlayerReadDataAsObject(playFabId, key){
+    return JSON.parse(getPlayerReadData(playFabId, key).Data[new String(key)].Value);
+}
+
 handlers.getPlayerForSabotage = function (args, context){
     var randomPlayfabId;
     var randomPlayerGold;
@@ -182,6 +190,8 @@ handlers.stealMoneyFromPlayer = function (args, context){
                 server.UpdatePlayerStatistics({PlayFabId : randomPlayfabId, Statistics: [{"StatisticName" : "gold", "Value" : statsCoins}]});
                 
                 updatePlayerInternalData(randomPlayfabId, currentPlayerId, null);
+                
+                setNews(currentPlayerId, randomPlayfabId, "steal", gold);
             }
         }
     }
@@ -467,5 +477,65 @@ function getFortsStars(forts){
     }
     
     return stars;
+}
+
+function setNews(from, to, type, info){
+    var fromName = server.GetUserAccountInfo({ "PlayFabId" : from }).UserInfo.TitleInfo.DisplayName;
+    var news;
+    var newsList = [];
+    
+    if(!fromName || fromName === ""){
+        fromName = new String(from);
+    }
+    
+    try{
+        news = getPlayerReadDataAsObject(to, "news");
+    }
+    catch{
+        news = {newsList : newsList};
+    }
+    
+    if(type == "steal"){
+        var newsInfo = {"from": fromName, "id": new String(type), "info": new String(info), "date": dateTODateTime()};
+        
+        if(!news.newsList || news.newsList.length == 0){
+            newsList.push(newsInfo);
+            news.newsList = newsList;
+        }
+        else{
+            news.newsList.unshift(newsInfo);
+        }
+    }
+    else if(type == "invasion"){
+        
+    }
+    
+    updatePlayerReadOnlyData(to, "news", news);
+}
+
+handlers.getNews = function(args, context){
+    var news;
+    try{
+        news = getPlayerReadData(currentPlayerId, "news");
+        
+        return {result : news.Data["news"].Value};
+    }
+    catch{
+        return {result : null};
+    }
+}
+
+function dateTODateTime(){
+    var date = new Date();
+    var day = date.getDate();      
+    var month = date.getMonth() + 1;    
+    var year = date.getFullYear();  
+    var hour = date.getHours();     
+    var minute = date.getMinutes(); 
+    var second = date.getSeconds(); 
+
+    var time = day + "/" + month + "/" + year + " " + hour + ':' + minute + ':' + second; 
+    
+    return time;
 }
     
