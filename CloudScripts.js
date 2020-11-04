@@ -50,28 +50,54 @@ function sumArray(array){
 handlers.getSpinThingID = function (args, context){
     var thingID = 0;
     
-    var getTitleDataRequest ={ "Keys": ["rouletteData"] };
+    var userData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    var getTitleData = getServerDataAsObject("rouletteData");
     
-    var getTitleData = server.GetTitleInternalData(getTitleDataRequest);
+    if(!userData.serverNextSpinDate || timeSpan(new Date(), new Date(JSON.parse(userData.serverNextSpinDate))).hours >= 24){
+        
+        var weights = [];
     
-    var json = JSON.parse(getTitleData.Data.rouletteData);
-    
-    var weights = json.weight;
-    
-    var weightSum = sumArray(weights);
-    
-    var randomValue = getRandomInt(weightSum);
-    
-    for(let i = 0; i < weights.length; i++){
-        if(randomValue < weights[i]){
-            thingID = i;
-            return { result: thingID };
+        for(let i = 0; i < getTitleData.length; i++){
+            weights.push(getTitleData[i].weight);
         }
-        randomValue -= weights[i];
+    
+        var weightSum = sumArray(weights);
+    
+        var randomValue = getRandomInt(weightSum);
+    
+        for(let i = 0; i < weights.length; i++){
+            if(randomValue < weights[i]){
+                thingID = i;
+                userData.nextSpinDate = dateTODateTime();
+                userData.serverNextSpinDate = JSON.stringify(new Date());
+            
+                if(getTitleData[i].id == "gold"){
+                    log.debug("gold");
+                    if(!args || !args.isX2Spin){
+                        userData.coins += getTitleData[i].addresourcegold;
+                        log.debug({ goldAdd : getTitleData[i].addresourcegold });
+                    }
+                    else{
+                        userData.coins += 2 * getTitleData[i].addresourcegold;
+                        log.debug({ goldAdd : (2 * getTitleData[i].addresourcegold) });
+                    }
+                    updatePlayerStatistics(currentPlayerId, "gold", userData.coins);
+                }
+                
+                updatePlayerData(currentPlayerId, "playerStats", userData);
+            
+                return { result: thingID };
+            }
+            randomValue -= weights[i];
+        }
     }
     
-    return { result: thingID };
+    return { result: -1 };
 };
+
+handlers.getSpinThings = function (args, context){
+    return {result : JSON.stringify(getServerDataAsObject("rouletteData"))};
+}
 
 function getServerData (key){
     return server.GetTitleInternalData({ "Keys": [new String(key)] });
@@ -129,7 +155,7 @@ handlers.getPlayerForSabotage = function (args, context){
         while(true){
             if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId != currentPlayerId){
                 randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
-                break;
+                break;getSpinThingID
             }
             else{
                 badPlayersIndexs.push(randomPlayerIndex);
@@ -221,6 +247,10 @@ function updatePlayerInternalData(playFabId, key, value){
     var result = server.UpdateUserInternalData(updatePlayerInternalDataRequest);
     
     return result;
+}
+
+function updatePlayerStatistics(playFabId, key, value){
+    server.UpdatePlayerStatistics({PlayFabId : playFabId, Statistics: [{"StatisticName" : new String(key), "Value" : JSON.stringify(value)}]});
 }
 
 handlers.getDailyChallenges = function (args, context){
