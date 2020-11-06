@@ -20,19 +20,13 @@ function getRandomInt(max) {
 function getRandomIntWithoutNumbers(numbers, max){
     var result = getRandomInt(max);
     
-    var flag = 0;
-    
-    do{
-        flag = 0;
-        
-        for(let i = 0; i < numbers.length; i++){
-            if(result == numbers[i]){
-                flag++;
-                break;
-            }
+    while(true){
+        if(numbers.indexOf(result) === -1){
+            break;
         }
+        
         result = getRandomInt(max);
-    }while(flag != 0);
+    }
     
     return result;
 }
@@ -155,7 +149,7 @@ handlers.getPlayerForSabotage = function (args, context){
         while(true){
             if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId != currentPlayerId){
                 randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
-                break;getSpinThingID
+                break;
             }
             else{
                 badPlayersIndexs.push(randomPlayerIndex);
@@ -475,12 +469,12 @@ function getUpgradeCost(fortID, buildingID, buildingLvl){
             if(upgradeCosts[i].fortification == buildingID + 1){
                 
                 if(buildingLvl == 0){
-                    if(upgradeCosts[i].upgrade == 1){
+                    if(upgradeCosts[i].upgrade === 1){
                         repairCost = upgradeCosts[i].payresourcegold / 2;
                     }
                 }
                 else{
-                    if(upgradeCosts[i].upgrade == buildingLvl){
+                    if(upgradeCosts[i].upgrade === Number(buildingLvl)){
                         repairCost = upgradeCosts[i].payresourcegold / 2;
                     }
                     
@@ -525,19 +519,14 @@ function setNews(from, to, type, info){
         news = {newsList : newsList};
     }
     
-    if(type == "steal"){
-        var newsInfo = {"from": fromName, "id": new String(type), "info": new String(info), "date": dateTODateTime()};
+    var newsInfo = {"from": fromName, "id": new String(type), "info": new String(info), "date": dateTODateTime()};
         
-        if(!news.newsList || news.newsList.length == 0){
-            newsList.push(newsInfo);
-            news.newsList = newsList;
-        }
-        else{
-            news.newsList.unshift(newsInfo);
-        }
+    if(!news.newsList || news.newsList.length == 0){
+        newsList.push(newsInfo);
+        news.newsList = newsList;
     }
-    else if(type == "invasion"){
-        
+    else{
+        news.newsList.unshift(newsInfo);
     }
     
     updatePlayerReadOnlyData(to, "news", news);
@@ -569,3 +558,102 @@ function dateTODateTime(){
     return time;
 }
     
+handlers.getPlayerForInvasion = function (args, context){
+    var randomPlayfabId;
+    var randomPlayerFort;
+    var randomPlayerName;
+    var isProtected = false;
+    
+    var getLeaderboardAroundPlayerRequest = { "MaxResultsCount" : 100, "StatisticName" : "fortStars", "PlayFabId" : currentPlayerId };
+    
+    var leaderBoardAroundPlayer = server.GetLeaderboard(getLeaderboardAroundPlayerRequest);
+    
+    var playerCount = leaderBoardAroundPlayer.Leaderboard.length;
+    
+    var randomPlayerIndex = getRandomInt(playerCount);
+    
+    log.debug(randomPlayerIndex);
+    
+    var badPlayersIndexs = [];
+    
+    if(playerCount > 1){
+        while(true){
+            if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId != currentPlayerId){
+                log.debug(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue);
+                randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
+                
+                if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0){
+                    break;
+                }
+                else{
+                    if(leaderBoardAroundPlayer.Leaderboard.length == badPlayersIndexs.length){
+                        return {result : null};
+                    }
+                    else{
+                        badPlayersIndexs.push(randomPlayerIndex);
+                        randomPlayerIndex = getRandomIntWithoutNumbers(badPlayersIndexs, playerCount);  
+                    }
+                }
+            }
+            else{
+                badPlayersIndexs.push(randomPlayerIndex);
+                randomPlayerIndex = getRandomIntWithoutNumbers(badPlayersIndexs, playerCount);
+            }
+        }
+    }
+    else{
+        return { result: null };
+    }
+    
+    randomPlayerName = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId }).UserInfo.TitleInfo.DisplayName;
+    
+    randomPlayerFort = JSON.parse(getPlayerData(randomPlayfabId, "forts").Data.forts.Value);
+    
+    //updatePlayerInternalData(randomPlayfabId, currentPlayerId, { Invader : currentPlayerId });
+    
+    return { result : {playerID : randomPlayfabId, isProtected : isProtected, fortName : randomPlayerName, fort : randomPlayerFort[0]} };
+};
+
+handlers.damageBuilding = function (args, context){
+    var playerID = args.playerID;
+    var playerFort = JSON.parse(getPlayerData(playerID, "forts").Data.forts.Value);
+    var invaders = [];
+    //var currentPlayerStats = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    //var stars = currentPlayerStats.stars.fortsStars + currentPlayerStats.stars.missionsStars;
+    
+    /*try{
+        invaders = getPlayerReadDataAsObject(playerID, "invaders");
+        
+        for(let i = 0; i < invaders.length; i++){
+            if(invaders.playerID == currentPlayerId){
+                break;
+            }
+            else{
+                if(i === invaders.length - 1){
+                    invaders.unshift({id : currentPlayerId, isFriend : false, stars : stars});
+                }
+            }
+        }
+    }
+    catch{
+        invaders.push({id : currentPlayerId, isFriend : false, stars : stars});
+    }*/
+    
+    if(playerFort[args.fortID].buildings[args.buildingID].wear < 3){
+        playerFort[args.fortID].buildings[args.buildingID].wear += 1;
+        
+        if(playerFort[args.fortID].buildings[args.buildingID].wear == 3){
+            playerFort[args.fortID].buildings[args.buildingID].wear = 0;
+            
+            if(playerFort[args.fortID].buildings[args.buildingID].lvl > 0){
+                playerFort[args.fortID].buildings[args.buildingID].lvl -= 1;
+            }
+        }
+    }
+    
+    setNews(currentPlayerId, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
+    
+    //updatePlayerReadOnlyData(playerID, "invaders", invaders);
+    
+    updatePlayerData(playerID, "forts", playerFort);
+}
