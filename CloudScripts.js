@@ -619,8 +619,41 @@ handlers.getPlayerForInvasion = function (args, context){
     
     //updatePlayerInternalData(randomPlayfabId, currentPlayerId, { Invader : currentPlayerId });
     
-    return { result : {playerID : randomPlayfabId, isProtected : isProtected, fortName : randomPlayerName, fort : randomPlayerFort[0]} };
+    return { result : {playerID : randomPlayfabId, isProtected : isProtected, fortName : randomPlayerName, fort : randomPlayerFort[0]}, outValue : JSON.stringify(getInvaders(currentPlayerId)) };
 };
+
+handlers.getPlayerForRevenge = function (args, context){
+    var currentID = currentPlayerId;
+    var playerID = args.playerID;
+    var playerFort;
+    var playerName;
+    var isProtected = false;
+    var invaders = [];
+    
+    log.debug("playerID: " + playerID);
+    
+    try{
+        invaders = getPlayerReadDataAsObject(currentID, "invaders");
+    }
+    catch{
+        log.debug("can't load invaders");
+    }
+    
+    playerFort = getPlayerDataAsObject(playerID, "forts");
+    playerName = server.GetUserAccountInfo({ "PlayFabId" : playerID }).UserInfo.TitleInfo.DisplayName;
+    
+    for(let i = invaders.length - 1; i >= 0; i--){
+        log.debug("id: " + invaders[i].id);
+        if(invaders[i].id == playerID){
+            invaders.splice(i, 1);
+            break;
+        }
+    }
+    
+    updatePlayerReadOnlyData(currentID, "invaders", invaders);
+    
+    return {result : {playerID : playerID, isProtected : isProtected, fortName: playerName, fort : playerFort[0]}, outValue : JSON.stringify(invaders) };
+}
 
 handlers.damageBuilding = function (args, context){
     var currentID = currentPlayerId;
@@ -640,23 +673,38 @@ handlers.damageBuilding = function (args, context){
         }
     }
     
-    setInvader(currentID, playerID, args.stars);
     setNews(currentID, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
     
     updatePlayerData(playerID, "forts", playerFort);
+    
+    setInvader(currentID, playerID, args.stars);
+}
+
+function getInvaders(playerID){
+    var invaders = [];
+    
+    try{
+        invaders = getPlayerReadDataAsObject(new String(playerID), "invaders");
+    }
+    catch{
+        
+    }
+    
+    return invaders;
 }
 
 function setInvader(from, playerID, stars){
     var invaders = [];
     var currentID = from;
+    var fromName = server.GetUserAccountInfo({ "PlayFabId" : currentID }).UserInfo.TitleInfo.DisplayName;
     
     try{
         invaders = getPlayerReadDataAsObject(new String(playerID), "invaders");
         
-        invaders.unshift({id : currentID, isFriend : false, stars : stars});
+        invaders.unshift({id : currentID, playerName : fromName, isFriend : false, stars : stars});
     }
     catch{
-        invaders.push({id : currentID, isFriend : false, stars : stars});
+        invaders.push({id : currentID, fromName : fromName, isFriend : false, stars : stars});
     }
     
     updatePlayerReadOnlyData(playerID, "invaders", invaders);
