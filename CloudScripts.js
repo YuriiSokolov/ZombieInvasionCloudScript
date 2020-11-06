@@ -42,9 +42,10 @@ function sumArray(array){
 }
 
 handlers.getSpinThingID = function (args, context){
+    var currentID = currentPlayerId;
     var thingID = 0;
     
-    var userData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    var userData = getPlayerDataAsObject(currentID, "playerStats");
     var getTitleData = getServerDataAsObject("rouletteData");
     
     if(!userData.serverNextSpinDate || timeSpan(new Date(), new Date(JSON.parse(userData.serverNextSpinDate))).hours >= 24){
@@ -75,10 +76,10 @@ handlers.getSpinThingID = function (args, context){
                         userData.coins += 2 * getTitleData[i].addresourcegold;
                         log.debug({ goldAdd : (2 * getTitleData[i].addresourcegold) });
                     }
-                    updatePlayerStatistics(currentPlayerId, "gold", userData.coins);
+                    updatePlayerStatistics(currentID, "gold", userData.coins);
                 }
                 
-                updatePlayerData(currentPlayerId, "playerStats", userData);
+                updatePlayerData(currentID, "playerStats", userData);
             
                 return { result: thingID };
             }
@@ -173,6 +174,7 @@ handlers.getPlayerForSabotage = function (args, context){
 };
 
 handlers.stealMoneyFromPlayer = function (args, context){
+    var currentID = currentPlayerId;
     var randomPlayfabId;
     var userInternalData;
     var goldBeforeSteal;
@@ -186,9 +188,9 @@ handlers.stealMoneyFromPlayer = function (args, context){
             randomPlayfabId = args.playFabId;
             gold = args.gold;
             
-            userInternalData = server.GetUserInternalData({ Keys: [currentPlayerId], PlayFabId : randomPlayfabId });
+            userInternalData = server.GetUserInternalData({ Keys: [currentID], PlayFabId : randomPlayfabId });
             
-            goldBeforeSteal = JSON.parse(userInternalData.Data[currentPlayerId].Value).gold;
+            goldBeforeSteal = JSON.parse(userInternalData.Data[currentID].Value).gold;
             maxStealGold = Math.floor(0.25 * goldBeforeSteal);
             
             if(gold <= maxStealGold){
@@ -209,9 +211,9 @@ handlers.stealMoneyFromPlayer = function (args, context){
                 
                 server.UpdatePlayerStatistics({PlayFabId : randomPlayfabId, Statistics: [{"StatisticName" : "gold", "Value" : statsCoins}]});
                 
-                updatePlayerInternalData(randomPlayfabId, currentPlayerId, null);
+                updatePlayerInternalData(randomPlayfabId, currentID, null);
                 
-                setNews(currentPlayerId, randomPlayfabId, "steal", gold);
+                setNews(currentID, randomPlayfabId, "steal", gold);
             }
         }
     }
@@ -248,9 +250,11 @@ function updatePlayerStatistics(playFabId, key, value){
 }
 
 handlers.getDailyChallenges = function (args, context){
+    var currentID = currentPlayerId;
+    
     var dailyQuestsList = getServerDataAsObject("DailyQuests");
     
-    var userDailyQuestsResult = server.GetUserReadOnlyData({PlayFabId : currentPlayerId, Keys : ["dailyChallenges"]});
+    var userDailyQuestsResult = server.GetUserReadOnlyData({PlayFabId : currentID, Keys : ["dailyChallenges"]});
     
     var userDailyQuests;
     
@@ -262,16 +266,16 @@ handlers.getDailyChallenges = function (args, context){
         userDailyQuests = JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value);
         
         playerData = userDailyQuests;
-        questsProgress = getPlayerDataAsObject(currentPlayerId, "questsProgress");
-        updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
+        questsProgress = getPlayerDataAsObject(currentID, "questsProgress");
+        updatePlayerData(currentID, "questsProgress", questsProgress);
         
         if(timeSpan(new Date(), new Date(JSON.parse(userDailyQuests.updateQuestDate))).hours >= 24){
             log.debug(">=24");
             userDailyQuests = getThreeQuests(dailyQuestsList);
             questsProgress = initQuestsProgressModel(userDailyQuests);
-            updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
+            updatePlayerData(currentID, "questsProgress", questsProgress);
             playerData = {"questList" : userDailyQuests, "updateQuestDate" : JSON.stringify(new Date())};
-            updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", playerData);
+            updatePlayerReadOnlyData(currentID, "dailyChallenges", playerData);
         }
     }
     catch{
@@ -279,19 +283,20 @@ handlers.getDailyChallenges = function (args, context){
         
         userDailyQuests = getThreeQuests(dailyQuestsList);
         questsProgress = initQuestsProgressModel(userDailyQuests);
-        updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
+        updatePlayerData(currentID, "questsProgress", questsProgress);
         playerData = {"questList" : userDailyQuests, "updateQuestDate" : JSON.stringify(new Date())};
-        updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", playerData);
+        updatePlayerReadOnlyData(currentID, "dailyChallenges", playerData);
     }
     
     return { result : playerData };
 }
 
 handlers.getQuestReward = function (args, context){
-    var userDailyQuestsResult = server.GetUserReadOnlyData({PlayFabId : currentPlayerId, Keys : ["dailyChallenges"]});
+    var currentID = currentPlayerId;
+    var userDailyQuestsResult = server.GetUserReadOnlyData({PlayFabId : currentID, Keys : ["dailyChallenges"]});
     var questList = JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value).questList;
-    var questsProgress = getPlayerDataAsObject(currentPlayerId, "questsProgress");
-    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    var questsProgress = getPlayerDataAsObject(currentID, "questsProgress");
+    var playerData = getPlayerDataAsObject(currentID, "playerStats");
     
     if(args){
         for(let i = 0; i < questList.length; i++){
@@ -303,9 +308,9 @@ handlers.getQuestReward = function (args, context){
                     
                     questList = {"questList" : questList, "updateQuestDate" : JSON.parse(userDailyQuestsResult.Data.dailyChallenges.Value).updateQuestDate};
                     
-                    updatePlayerData(currentPlayerId, "playerStats", playerData);
-                    updatePlayerData(currentPlayerId, "questsProgress", questsProgress);
-                    updatePlayerReadOnlyData(currentPlayerId, "dailyChallenges", questList);
+                    updatePlayerData(currentID, "playerStats", playerData);
+                    updatePlayerData(currentID, "questsProgress", questsProgress);
+                    updatePlayerReadOnlyData(currentID, "dailyChallenges", questList);
                     
                     return {result : playerData};
                 }   
@@ -370,7 +375,8 @@ function updatePlayerReadOnlyData(playFabId, key, value){
 }
 
 handlers.setArtefact = function (args, context){
-    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    var currentID = currentPlayerId;
+    var playerData = getPlayerDataAsObject(currentID, "playerStats");
     
     if(args){
         if(args.value){
@@ -378,7 +384,7 @@ handlers.setArtefact = function (args, context){
             
             playerData.artifacts.push(JSON.parse(args.value));
             
-            updatePlayerData(currentPlayerId, "playerStats", playerData);
+            updatePlayerData(currentID, "playerStats", playerData);
         }
     }
     
@@ -386,7 +392,8 @@ handlers.setArtefact = function (args, context){
 }
 
 handlers.getArtefact = function (args, context){
-    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    var currentID = currentPlayerId;
+    var playerData = getPlayerDataAsObject(currentID, "playerStats");
     
     if(args){
         if(args.artifactID){
@@ -395,8 +402,8 @@ handlers.getArtefact = function (args, context){
             for(let i = 0; i < playerData.artifacts.length; i++){
                 if(playerData.artifacts[i].id == args.artifactID){
                     playerData.artifacts.splice(i, 1);
-                    updatePlayerData(currentPlayerId, "playerStats", playerData);
-                    return {result : getPlayerData(currentPlayerId, "playerStats").Data["playerStats"].Value};
+                    updatePlayerData(currentID, "playerStats", playerData);
+                    return {result : getPlayerData(currentID, "playerStats").Data["playerStats"].Value};
                 }
             }
         }
@@ -407,12 +414,13 @@ handlers.getArtefact = function (args, context){
 
 handlers.updateSave = function (args, context){
     if(args){
-        var playerData = getPlayerDataAsObject(currentPlayerId, args.key);
+        var currentID = currentPlayerId;
+        var playerData = getPlayerDataAsObject(currentID, args.key);
         
         switch (args.key) {
             case 'playerStats':
                 playerData.coins += args.gold;
-                server.UpdatePlayerStatistics({PlayFabId : currentPlayerId, Statistics: [{"StatisticName" : "gold", "Value" : args.gold}]});
+                server.UpdatePlayerStatistics({PlayFabId : currentID, Statistics: [{"StatisticName" : "gold", "Value" : args.gold}]});
                 break;
             case 'forts':
                 break;
@@ -422,13 +430,14 @@ handlers.updateSave = function (args, context){
         
         updatePlayerData(currentPlayerId, args.key, playerData);
         
-        return { result : getPlayerData(currentPlayerId, args.key).Data[args.key].Value, tag : args.key};
+        return { result : JSON.stringify(playerData), tag : args.key};
     }
 }
 
 handlers.buyUpgrade = function (args, context){
-    var forts = getPlayerDataAsObject(currentPlayerId, "forts");
-    var playerData = getPlayerDataAsObject(currentPlayerId, "playerStats");
+    var currentID = currentPlayerId;
+    var forts = getPlayerDataAsObject(currentID, "forts");
+    var playerData = getPlayerDataAsObject(currentID, "playerStats");
     
     var building = forts[args.fortID].buildings[args.buildingID];
         
@@ -438,7 +447,7 @@ handlers.buyUpgrade = function (args, context){
         if((playerData.coins >= costs.upgradeCost) && (building.lvl + 1 <= 5)){
             building.lvl += 1;
             playerData.stars.fortsStars = getFortsStars(forts) + 1;
-            //server.UpdatePlayerStatistics({PlayFabId : currentPlayerId, Statistics: [{"StatisticName" : "fortStars", "Value" : playerData.stars.fortsStars}]});
+            server.UpdatePlayerStatistics({PlayFabId : currentID, Statistics: [{"StatisticName" : "fortStars", "Value" : playerData.stars.fortsStars}]});
             playerData.coins -= costs.upgradeCost;
         }
     }
@@ -449,12 +458,11 @@ handlers.buyUpgrade = function (args, context){
         }
     }
 
-    updatePlayerData(currentPlayerId, "forts", forts);
+    updatePlayerData(currentID, "forts", forts);
     playerData.stars.fortsStars = getFortsStars(forts);
-    server.UpdatePlayerStatistics({PlayFabId : currentPlayerId, Statistics: [{"StatisticName" : "fortStars", "Value" : playerData.stars.fortsStars}]});
-    updatePlayerData(currentPlayerId, "playerStats", playerData);
+    updatePlayerData(currentID, "playerStats", playerData);
     
-    return {result : getPlayerData(currentPlayerId, "forts").Data["forts"].Value, tag : building.name};
+    return {result : getPlayerData(currentID, "forts").Data["forts"].Value, tag : building.name};
 }
 
 function getUpgradeCost(fortID, buildingID, buildingLvl){
@@ -645,17 +653,7 @@ function setInvader(from, playerID, stars){
     try{
         invaders = getPlayerReadDataAsObject(new String(playerID), "invaders");
         
-        for(let i = 0; i < invaders.length; i++){
-            if(invaders[i].id == currentID){
-                log.debug("exists");
-                break;
-            }
-            else{
-                if(i === invaders.length - 1){
-                    invaders.unshift({id : currentID, isFriend : false, stars : stars});
-                }
-            }
-        }
+        invaders.unshift({id : currentID, isFriend : false, stars : stars});
     }
     catch{
         invaders.push({id : currentID, isFriend : false, stars : stars});
