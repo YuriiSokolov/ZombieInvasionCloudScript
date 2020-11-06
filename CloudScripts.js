@@ -615,29 +615,9 @@ handlers.getPlayerForInvasion = function (args, context){
 };
 
 handlers.damageBuilding = function (args, context){
+    var currentID = currentPlayerId;
     var playerID = args.playerID;
     var playerFort = JSON.parse(getPlayerData(playerID, "forts").Data.forts.Value);
-    var invaders = [];
-    //var currentPlayerStats = getPlayerDataAsObject(currentPlayerId, "playerStats");
-    //var stars = currentPlayerStats.stars.fortsStars + currentPlayerStats.stars.missionsStars;
-    
-    /*try{
-        invaders = getPlayerReadDataAsObject(playerID, "invaders");
-        
-        for(let i = 0; i < invaders.length; i++){
-            if(invaders.playerID == currentPlayerId){
-                break;
-            }
-            else{
-                if(i === invaders.length - 1){
-                    invaders.unshift({id : currentPlayerId, isFriend : false, stars : stars});
-                }
-            }
-        }
-    }
-    catch{
-        invaders.push({id : currentPlayerId, isFriend : false, stars : stars});
-    }*/
     
     if(playerFort[args.fortID].buildings[args.buildingID].wear < 3){
         playerFort[args.fortID].buildings[args.buildingID].wear += 1;
@@ -647,13 +627,39 @@ handlers.damageBuilding = function (args, context){
             
             if(playerFort[args.fortID].buildings[args.buildingID].lvl > 0){
                 playerFort[args.fortID].buildings[args.buildingID].lvl -= 1;
+                server.UpdatePlayerStatistics({PlayFabId : playerID, Statistics: [{"StatisticName" : "fortStars", "Value" : getFortsStars(playerFort)}]});
             }
         }
     }
     
-    setNews(currentPlayerId, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
-    
-    //updatePlayerReadOnlyData(playerID, "invaders", invaders);
+    setInvader(currentID, playerID, args.stars);
+    setNews(currentID, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
     
     updatePlayerData(playerID, "forts", playerFort);
+}
+
+function setInvader(from, playerID, stars){
+    var invaders = [];
+    var currentID = from;
+    
+    try{
+        invaders = getPlayerReadDataAsObject(new String(playerID), "invaders");
+        
+        for(let i = 0; i < invaders.length; i++){
+            if(invaders[i].id == currentID){
+                log.debug("exists");
+                break;
+            }
+            else{
+                if(i === invaders.length - 1){
+                    invaders.unshift({id : currentID, isFriend : false, stars : stars});
+                }
+            }
+        }
+    }
+    catch{
+        invaders.push({id : currentID, isFriend : false, stars : stars});
+    }
+    
+    updatePlayerReadOnlyData(playerID, "invaders", invaders);
 }
