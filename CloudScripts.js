@@ -392,8 +392,8 @@ handlers.setArtefact = function (args, context){
 }
 
 handlers.getArtefact = function (args, context){
-    var currentID = currentPlayerId;
-    var playerData = getPlayerDataAsObject(currentID, "playerStats");
+    var currentID = args.currentID ? args.currentID : currentPlayerId;
+    var playerData = args.playerData ? args.playerData : getPlayerDataAsObject(currentID, "playerStats");
     
     if(args){
         if(args.artifactID){
@@ -569,6 +569,7 @@ function dateTODateTime(){
 handlers.getPlayerForInvasion = function (args, context){
     var randomPlayfabId;
     var randomPlayerFort;
+    var currentFort = 0;
     var randomPlayerName;
     var isProtected = false;
     
@@ -615,17 +616,32 @@ handlers.getPlayerForInvasion = function (args, context){
     
     randomPlayerName = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId }).UserInfo.TitleInfo.DisplayName;
     
-    randomPlayerFort = JSON.parse(getPlayerData(randomPlayfabId, "forts").Data.forts.Value);
+    var protectionResult = handlers.getProtection({currentID : randomPlayfabId});
+    
+    log.debug(protectionResult.result);
+    
+    randomPlayerFort = protectionResult.result;
+    
+    isProtected = protectionResult.outValue;
+    
+    /*if(randomPlayerFort[currentFort].serverProtectionStartDate != null){
+        log.debug("serverProtectionStartDate");
+        if(timeSpan(new Date(), new Date(JSON.parse(randomPlayerFort[currentFort].serverProtectionStartDate))).hours < 8){
+            log.debug("timeSpan");
+            isProtected = true;
+        }
+    }*/
     
     //updatePlayerInternalData(randomPlayfabId, currentPlayerId, { Invader : currentPlayerId });
     
-    return { result : {playerID : randomPlayfabId, isProtected : isProtected, fortName : randomPlayerName, fort : randomPlayerFort[0]}, outValue : JSON.stringify(getInvaders(currentPlayerId)) };
+    return { result : {playerID : randomPlayfabId, isProtected : isProtected, fortName : randomPlayerName, fort : randomPlayerFort[currentFort]}, outValue : JSON.stringify(getInvaders(currentPlayerId)) };
 };
 
 handlers.getPlayerForRevenge = function (args, context){
     var currentID = currentPlayerId;
     var playerID = args.playerID;
     var playerFort;
+    var currentFort = 0;
     var playerName;
     var isProtected = false;
     var invaders = [];
@@ -639,7 +655,7 @@ handlers.getPlayerForRevenge = function (args, context){
         log.debug("can't load invaders");
     }
     
-    playerFort = getPlayerDataAsObject(playerID, "forts");
+    //playerFort = getPlayerDataAsObject(playerID, "forts");
     playerName = server.GetUserAccountInfo({ "PlayFabId" : playerID }).UserInfo.TitleInfo.DisplayName;
     
     for(let i = invaders.length - 1; i >= 0; i--){
@@ -650,9 +666,21 @@ handlers.getPlayerForRevenge = function (args, context){
         }
     }
     
+    var protectionResult = handlers.getProtection({currentID : playerID});
+    
+    playerFort = protectionResult.result;
+    
+    isProtected = protectionResult.outValue;
+    
     updatePlayerReadOnlyData(currentID, "invaders", invaders);
     
-    return {result : {playerID : playerID, isProtected : isProtected, fortName: playerName, fort : playerFort[0]}, outValue : JSON.stringify(invaders) };
+    /*if(playerFort[currentFort].serverProtectionStartData != null){
+        if(timeSpan(new Date(), new Date(JSON.parse(playerFort[currentFort].serverProtectionStartData))).hours < 8){
+            isProtected = true;
+        }
+    }*/
+    
+    return {result : {playerID : playerID, isProtected : isProtected, fortName: playerName, fort : playerFort[currentFort]}, outValue : JSON.stringify(invaders) };
 }
 
 handlers.damageBuilding = function (args, context){
@@ -661,13 +689,13 @@ handlers.damageBuilding = function (args, context){
     var playerFort = JSON.parse(getPlayerData(playerID, "forts").Data.forts.Value);
     
     if(playerFort[args.fortID].buildings[args.buildingID].wear < 3){
-        playerFort[args.fortID].buildings[args.buildingID].wear += 1;
+        playerFort[args.fortID].buildings[args.buildingID].wear += args.multiplier;
         
-        if(playerFort[args.fortID].buildings[args.buildingID].wear == 3){
+        if(playerFort[args.fortID].buildings[args.buildingID].wear >= 3){
             playerFort[args.fortID].buildings[args.buildingID].wear = 0;
             
             if(playerFort[args.fortID].buildings[args.buildingID].lvl > 0){
-                playerFort[args.fortID].buildings[args.buildingID].lvl -= 1;
+                playerFort[args.fortID].buildings[args.buildingID].lvl = 0;
                 server.UpdatePlayerStatistics({PlayFabId : playerID, Statistics: [{"StatisticName" : "fortStars", "Value" : getFortsStars(playerFort)}]});
             }
         }
@@ -708,4 +736,33 @@ function setInvader(from, playerID, stars){
     }
     
     updatePlayerReadOnlyData(playerID, "invaders", invaders);
+}
+
+handlers.getProtection = function(args, context){
+    var isProtected = false;
+    var currentID; 
+    
+    if(args && args.currentID){
+        currentID = args.currentID;
+    }
+    else{
+        currentID = currentPlayerId;
+    }
+    
+    var forts = getPlayerDataAsObject(currentID, "forts");
+    var playerData = getPlayerDataAsObject(currentID, "playerStats");
+    
+    if(handlers.getArtefact({"currentID" : currentID, "playerData" : playerData, "artifactID" : "shield"}).result != "error"){
+        for(let i = 0; i < forts.length; i++){
+            forts[i].protectionStartDate = dateTODateTime();
+            forts[i].serverProtectionStartDate = JSON.stringify(new Date());
+        }
+        isProtected = true;
+        updatePlayerData(currentID, "forts", forts);
+    }
+    else{
+        log.debug("shield artifact not exists");
+    }
+    
+    return {result : forts, outValue : isProtected};
 }
