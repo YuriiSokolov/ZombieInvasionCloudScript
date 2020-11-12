@@ -435,6 +435,7 @@ handlers.updateSave = function (args, context){
 }
 
 handlers.buyUpgrade = function (args, context){
+    var maxStarsInChapter = 25;
     var currentID = currentPlayerId;
     var forts = getPlayerDataAsObject(currentID, "forts");
     var playerData = getPlayerDataAsObject(currentID, "playerStats");
@@ -446,7 +447,7 @@ handlers.buyUpgrade = function (args, context){
     if(building.wear == 0){
         if((playerData.coins >= costs.upgradeCost) && (building.lvl + 1 <= 5)){
             building.lvl += 1;
-            playerData.stars.fortsStars = getFortsStars(forts) + 1;
+            playerData.stars.fortsStars = getFortsStars(forts);
             server.UpdatePlayerStatistics({PlayFabId : currentID, Statistics: [{"StatisticName" : "fortStars", "Value" : playerData.stars.fortsStars}]});
             playerData.coins -= costs.upgradeCost;
         }
@@ -461,6 +462,13 @@ handlers.buyUpgrade = function (args, context){
     updatePlayerData(currentID, "forts", forts);
     playerData.stars.fortsStars = getFortsStars(forts);
     updatePlayerData(currentID, "playerStats", playerData);
+    
+    if(playerData.stars.fortsStars == maxStarsInChapter || playerData.stars.fortsStars == 2 * maxStarsInChapter){ //Open new chapter.
+        var chapters = openNewChapter((playerData.stars.fortsStars % (maxStarsInChapter - 1)));
+        log.debug(chapters);
+        
+        return {result : getPlayerData(currentID, "forts").Data["forts"].Value, tag : building.name, outValue : chapters};
+    }
     
     return {result : getPlayerData(currentID, "forts").Data["forts"].Value, tag : building.name};
 }
@@ -567,6 +575,7 @@ function dateTODateTime(){
 }
     
 handlers.getPlayerForInvasion = function (args, context){
+    var maxStarsInChapter = 25;
     var randomPlayfabId;
     var randomPlayerFort;
     var currentFort = 0;
@@ -591,7 +600,8 @@ handlers.getPlayerForInvasion = function (args, context){
                 log.debug(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue);
                 randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
                 
-                if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0){
+                if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0 && leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != maxStarsInChapter 
+                || leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != (2 * maxStarsInChapter)){
                     break;
                 }
                 else{
@@ -640,11 +650,14 @@ handlers.getPlayerForInvasion = function (args, context){
 handlers.getPlayerForRevenge = function (args, context){
     var currentID = currentPlayerId;
     var playerID = args.playerID;
-    var playerFort;
+    var playerFort = getPlayerDataAsObject(playerID, "forts");
     var currentFort = 0;
     var playerName;
     var isProtected = false;
     var invaders = [];
+    var stars = getFortsStars(playerFort);
+    
+    log.debug("stars: " + stars);
     
     log.debug("playerID: " + playerID);
     
@@ -666,11 +679,17 @@ handlers.getPlayerForRevenge = function (args, context){
         }
     }
     
-    var protectionResult = handlers.getProtection({currentID : playerID});
+    if(stars != 25 && stars != 50){
+        var protectionResult = handlers.getProtection({currentID : playerID, forts : playerFort});
     
-    playerFort = protectionResult.result;
+        playerFort = protectionResult.result;
     
-    isProtected = protectionResult.outValue;
+        isProtected = protectionResult.outValue;
+    }
+    else{
+        log.debug("Full fort");
+        isProtected = true;
+    }
     
     updatePlayerReadOnlyData(currentID, "invaders", invaders);
     
@@ -750,6 +769,14 @@ handlers.getProtection = function(args, context){
     }
     
     var forts = getPlayerDataAsObject(currentID, "forts");
+    
+    if(args.forts){
+        forts = args.forts;
+    }
+    else{
+        forts = getPlayerDataAsObject(currentID, "forts");
+    }
+    
     var playerData = getPlayerDataAsObject(currentID, "playerStats");
     
     if(handlers.getArtefact({"currentID" : currentID, "playerData" : playerData, "artifactID" : "shield"}).result != "error"){
@@ -765,4 +792,37 @@ handlers.getProtection = function(args, context){
     }
     
     return {result : forts, outValue : isProtected};
+}
+
+handlers.getChaptersInfo = function(args, context){
+    var chapters = getServerDataAsObject("Chapters");
+    
+    updatePlayerData(currentPlayerId, "chapters", {chapters : chapters, currentChapter : chapters[0]});
+    
+    return {result : chapters, outValue : chapters[0].id};
+}
+
+function openNewChapter(chapterID){
+    var currentID = currentPlayerId;
+    var chapters = getPlayerDataAsObject(currentID, "chapters");
+    chapters.currentChapter = chapters.chapters[new Number(chapterID)];
+    
+    log.debug(chapters.currentChapter);
+    
+    updatePlayerData(currentID, "chapters", chapters);
+    
+    return chapters;
+}
+
+handlers.openNewChapter = function(args, context){
+    var currentID = currentPlayerId;
+    var chapters = getPlayerDataAsObject(currentID, "chapters");
+    
+    chapters.currentChapter = chapters.chapters[new Number(args.chapterID)];
+    
+    log.debug(chapters.currentChapter);
+    
+    updatePlayerData(currentID, "chapters", chapters);
+    
+    return chapters;
 }
