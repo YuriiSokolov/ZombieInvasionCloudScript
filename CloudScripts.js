@@ -601,7 +601,7 @@ handlers.getPlayerForInvasion = function (args, context){
                 randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
                 
                 if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0 && leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != maxStarsInChapter 
-                || leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != (2 * maxStarsInChapter)){
+                && leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != (2 * maxStarsInChapter)){
                     break;
                 }
                 else{
@@ -825,4 +825,32 @@ handlers.openNewChapter = function(args, context){
     updatePlayerData(currentID, "chapters", chapters);
     
     return chapters;
+}
+
+handlers.getEnemiesData = function(args, context){
+    return {result : getServerDataAsObject("Zombies"), outValue : getServerDataAsObject("ZombiesInChapters")};
+}
+
+handlers.getGameProperties = function(args, context){
+    return {result : {upgradesList : createUpgradesList()}};
+}
+
+function createUpgradesList(){
+    var upgradesList = [];
+    
+    var fortification = getServerDataAsObject("Fortification");
+    var fortificationBonuses = getServerDataAsObject("FortificationBonuses");
+    var fortificationUpgrades = getServerDataAsObject("FortificationUpgrades");
+    var chapters = getServerDataAsObject("Chapters");
+    
+    for(let i = 0; i < fortificationUpgrades.length; i = i + 5){
+        var buildingID = fortificationUpgrades[i].fortification - 1;
+        var upgradeName = fortification[buildingID].upgrade;
+        var multiplier = fortificationBonuses.find(e => e.upgrade == upgradeName).bonus;
+        var chapterID = chapters.find(c => c.order == (fortificationUpgrades[i].chapter - 1)).id;
+        
+        upgradesList.push({ upgradeName : upgradeName, multiplier : multiplier, chapterID : chapterID, buildingID : buildingID });
+    }
+    
+    return upgradesList;
 }
