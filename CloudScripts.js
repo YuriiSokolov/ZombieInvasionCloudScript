@@ -61,6 +61,10 @@ handlers.getSpinThingID = function (args, context){
         var randomValue = getRandomInt(weightSum);
     
         for(let i = 0; i < weights.length; i++){
+    updatePlayerData(currentID, "forts", forts);
+    playerData.stars.fortsStars = getFortsStars(forts);
+    updatePlayerData(currentID, "playerStats", playerData);
+    
             if(randomValue < weights[i]){
                 thingID = i;
                 userData.nextSpinDate = dateTODateTime();
@@ -459,16 +463,21 @@ handlers.buyUpgrade = function (args, context){
         }
     }
 
-    updatePlayerData(currentID, "forts", forts);
     playerData.stars.fortsStars = getFortsStars(forts);
     updatePlayerData(currentID, "playerStats", playerData);
-    
+
     if(playerData.stars.fortsStars == maxStarsInChapter || playerData.stars.fortsStars == 2 * maxStarsInChapter){ //Open new chapter.
+        forts[args.fortID].isCompleteFort = true;
+        log.debug(forts[args.fortID].isCompleteFort);
         var chapters = openNewChapter((playerData.stars.fortsStars % (maxStarsInChapter - 1)));
         log.debug(chapters);
         
+        updatePlayerData(currentID, "forts", forts);
+        
         return {result : getPlayerData(currentID, "forts").Data["forts"].Value, tag : building.name, outValue : chapters};
     }
+    
+    updatePlayerData(currentID, "forts", forts);
     
     return {result : getPlayerData(currentID, "forts").Data["forts"].Value, tag : building.name};
 }
@@ -595,22 +604,26 @@ handlers.getPlayerForInvasion = function (args, context){
     var badPlayersIndexs = [];
     
     if(playerCount > 1){
-        while(true){
+        for(let i = 0; i < playerCount; i++){
             if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId != currentPlayerId){
                 log.debug(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue);
                 randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
                 
-                if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0 && leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != maxStarsInChapter 
-                && leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != (2 * maxStarsInChapter)){
+                if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0 && (leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != maxStarsInChapter 
+                && leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != (2 * maxStarsInChapter))){
                     break;
                 }
                 else{
                     if(leaderBoardAroundPlayer.Leaderboard.length == badPlayersIndexs.length){
                         return {result : null};
                     }
-                    else{
+                    else if (i != playerCount - 1){
                         badPlayersIndexs.push(randomPlayerIndex);
                         randomPlayerIndex = getRandomIntWithoutNumbers(badPlayersIndexs, playerCount);  
+                    }
+                    else{
+                        log.debug("not found");
+                        return {result : null};
                     }
                 }
             }
