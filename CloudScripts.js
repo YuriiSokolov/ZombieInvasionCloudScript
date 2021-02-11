@@ -42,7 +42,10 @@ function sumArray(array){
 }
 
 function getFacebookName(playerInfo){
-    var name = playerInfo.UserInfo.FacebookInfo.FullName ? new String(playerInfo.UserInfo.FacebookInfo.FullName) : null;
+    var name = null;
+    
+    if(playerInfo.UserInfo.FacebookInfo != null)
+        name = new String(playerInfo.UserInfo.FacebookInfo.FullName);
     
     if(name != null){
         return name;
@@ -1144,3 +1147,4 @@ function createUpgradesList(){
     
     return upgradesList;
 }
+
