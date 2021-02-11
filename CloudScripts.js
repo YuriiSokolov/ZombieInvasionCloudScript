@@ -41,6 +41,257 @@ function sumArray(array){
     return sum;
 }
 
+function getFacebookName(playerInfo){
+    var name = playerInfo.UserInfo.FacebookInfo.FullName ? new String(playerInfo.UserInfo.FacebookInfo.FullName) : null;
+    
+    if(name != null){
+        return name;
+    }
+    
+    return null;
+}
+
+handlers.deletePlayerData = function (args, context){
+    var currentID = currentPlayerId;
+    handlers.getChaptersInfo();
+    handlers.getFortsModel();
+    handlers.getUserModel();
+    
+    updatePlayerReadOnlyData(currentID, "invaders", []);
+    
+    var news = {"newsList" : []};
+    updatePlayerReadOnlyData(currentID, "news", news);
+    
+    var quests = {questList : [], updateQuestDate : null};
+    updatePlayerReadOnlyData(currentID, "dailyChallenges", quests);
+    
+    handlers.getDailyChallenges();
+    
+    //energy
+        
+    handlers.getStartEnergy();
+    
+    return {result : "Done"};
+}
+
+//Energy
+
+handlers.getStartEnergy = function (args, context){
+    var energy = {};
+    
+    var energyModel = getServerDataAsObject("EnergySystem");
+    
+    var reloadTimer = energyModel.find(e => e.name == "addEnergyTimer").value;
+    var energyCount = energyModel.find(e => e.name == "startEnergy").value;
+    
+    energy = {addEnergyTimer : reloadTimer, currentAddEnergyTimer : reloadTimer, currentEnergy : energyCount };
+    
+    updatePlayerData(currentPlayerId, "energy", energy);
+    
+    return {result : energy};
+}
+
+handlers.getEnergy = function (args, context){
+    var currentID = currentPlayerId;
+    
+    var energySystem = getServerDataAsObject("EnergySystem");
+    
+    var maxEnergy = energySystem.find(e => e.name == "startEnergy").value;
+    
+    var addEnergyTimer = energySystem.find(e => e.name == "addEnergyTimer").value;
+    
+    var energy = getPlayerDataAsObject(currentID, "energy");
+    
+    log.debug(energy);
+    
+    if(energy){
+        if(energy.currentEnergy < maxEnergy){
+        
+            var timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+        
+            log.debug("addEnergyTimer " + addEnergyTimer);
+            
+            if(timeAfterFirstEnergyUse >= addEnergyTimer){
+                energy.currentEnergy += Math.floor(timeAfterFirstEnergyUse / addEnergyTimer);
+        
+                if(energy.currentEnergy >= maxEnergy){
+                    energy.currentEnergy = maxEnergy;
+                    energy.currentAddEnergyTimer = addEnergyTimer;
+                    energy.lastEnergyUseDate = null;
+                }
+                else{
+                    energy.lastEnergyUseDate = JSON.stringify(new Date());
+                    energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+                }
+            }
+            else{
+                energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+            }
+        
+            energy.addEnergyTimer = addEnergyTimer;
+        }
+    }
+    else{
+        energy = {addEnergyTimer : addEnergyTimer, currentAddEnergyTimer : addEnergyTimer, currentEnergy : maxEnergy };
+    }
+    
+    log.debug(energy)
+    
+    updatePlayerData(currentID, "energy", energy);
+    
+    return {result : energy};
+}
+
+handlers.minusEnergy = function (args, context){
+    var currentID = currentPlayerId;
+    
+    var energy = getPlayerDataAsObject(currentID, "energy");
+    
+    var energySystem = getServerDataAsObject("EnergySystem");
+    
+    var maxEnergy = energySystem.find(e => e.name == "startEnergy").value;
+    
+    var addEnergyTimer = energySystem.find(e => e.name == "addEnergyTimer").value;
+    
+    var timeAfterFirstEnergyUse;
+    
+    if(args.energyMode && energy.currentEnergy >= args.energyMode){
+        energy.currentEnergy -= args.energyMode;
+            
+        if(energy.lastEnergyUseDate == null)
+            energy.lastEnergyUseDate = JSON.stringify(new Date());
+            
+            
+        timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+        
+        energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+        energy.addEnergyTimer = addEnergyTimer;
+        
+        updatePlayerData(currentID, "energy", energy);
+       
+        return {result : energy, outValue : true};
+    }
+    else{
+        timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+        
+        energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+        energy.addEnergyTimer = addEnergyTimer;
+        
+        updatePlayerData(currentID, "energy", energy);
+        
+        return {result : energy, outValue : false};
+    }
+}
+
+handlers.addEnergy = function (args, context){
+    var currentID = currentPlayerId;
+    
+    var energy = getPlayerDataAsObject(currentID, "energy");
+    
+    var energySystem = getServerDataAsObject("EnergySystem");
+    
+    var maxEnergy = energySystem.find(e => e.name == "startEnergy").value;
+    
+    var addEnergyTimer = energySystem.find(e => e.name == "addEnergyTimer").value;
+    
+    if(args){
+        if(args.energyCount){
+            energy.currentEnergy += args.energyCount;
+            
+            updatePlayerData(currentID, "energy", energy);
+            
+            return {result : energy};
+        }
+    }
+    else{
+        if(energy.lastEnergyUseDate != null && energy.currentEnergy < maxEnergy){
+            var timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+            log.debug("seconds " + timeAfterFirstEnergyUse);
+        
+            if(timeAfterFirstEnergyUse >= energy.addEnergyTimer && energy.currentEnergy < maxEnergy){
+                energy.currentEnergy += Math.floor(timeAfterFirstEnergyUse / addEnergyTimer);
+                log.debug(Math.floor(timeAfterFirstEnergyUse / energy.addEnergyTimer));
+            
+                if(energy.currentEnergy >= maxEnergy){
+                    energy.currentEnergy = maxEnergy;
+                    energy.currentAddEnergyTimer = addEnergyTimer;
+                    energy.lastEnergyUseDate = null;
+                }
+                else{
+                    energy.lastEnergyUseDate = JSON.stringify(new Date());
+                    timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+                    
+                    energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+                }
+                
+                log.debug("Add Energy.");
+            }
+            else{
+                energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+                
+                log.debug("Can't add energy.");
+            }
+            
+            energy.addEnergyTimer = addEnergyTimer;
+            updatePlayerData(currentID, "energy", energy);
+            return {result : energy};
+        }
+        else{
+            return {result : energy};
+        }
+    }
+}
+
+//===============================================
+handlers.getUserModel = function (args, context){
+    var currentID = currentPlayerId;
+    var startPlayerData = getServerDataAsObject("playerStartResources");
+    var artifacts = [];
+    var stars = {fortsStars : 0, missionsStars : 0};
+    
+    var playerStats = { coins : startPlayerData.find(e => e.resource == "gold").value, energy : startPlayerData.find(e => e.resource == "energy").value, artifacts : artifacts, stars : stars };
+    
+    updatePlayerData(currentID, "playerStats", playerStats);
+    
+    return {result: playerStats};
+}
+
+handlers.getFortsModel = function (args, context){
+    var currentID = currentPlayerId;
+    
+    var fortsModel = getServerDataAsObject("FortsModel");
+    var buildings = getServerDataAsObject("FortBuildings");
+    
+    var forts = [];
+    
+    var index = 0;
+    
+    for(let i = 0; i < fortsModel.length; i++){
+        forts.push({fortID : fortsModel[i].fortid, fortName : fortsModel[i].fortname, isCompleteFort : fortsModel[i].iscompletefort});
+        forts[i].buildings = [];
+        for(let j = 0; j < buildings.length / 3; j++){
+            forts[i].buildings.push(buildings[j + index]);
+        }
+        index += buildings.length / 3;
+    }
+    
+    updatePlayerData(currentID, "forts", forts);
+    server.UpdatePlayerStatistics({PlayFabId : currentID, Statistics: [{"StatisticName" : "fortStars", "Value" : 0}]});
+    
+    try{
+        var playerStats = getPlayerDataAsObject(currentID, "playerStats");
+    
+        playerStats.stars.fortsStars = 0;
+    
+        updatePlayerData(currentID, "playerStats", playerStats);
+    }
+    catch{
+        log.debug("playerStats don't found");
+    }
+    
+    return {result : forts};
+}
+
 handlers.getSpinThingID = function (args, context){
     var currentID = currentPlayerId;
     var thingID = 0;
@@ -61,10 +312,6 @@ handlers.getSpinThingID = function (args, context){
         var randomValue = getRandomInt(weightSum);
     
         for(let i = 0; i < weights.length; i++){
-    updatePlayerData(currentID, "forts", forts);
-    playerData.stars.fortsStars = getFortsStars(forts);
-    updatePlayerData(currentID, "playerStats", playerData);
-    
             if(randomValue < weights[i]){
                 thingID = i;
                 userData.nextSpinDate = dateTODateTime();
@@ -81,6 +328,20 @@ handlers.getSpinThingID = function (args, context){
                         log.debug({ goldAdd : (2 * getTitleData[i].addresourcegold) });
                     }
                     updatePlayerStatistics(currentID, "gold", userData.coins);
+                }
+                else if(getTitleData[i].id == "energy"){
+                    var energy = getPlayerDataAsObject(currentID, "energy");
+                    
+                    if(!args || !args.isX2Spin){
+                        energy.currentEnergy += getTitleData[i].addresourceenergy;
+                        log.debug({addEnergy : getTitleData[i].addresourceenergy});
+                    }
+                    else{
+                        energy.currentEnergy += 2 * getTitleData[i].addresourceenergy;
+                        log.debug({addEnergy :(2 * getTitleData[i].addresourceenergy)});
+                    }
+                    
+                    updatePlayerData(currentID, "energy", energy);
                 }
                 
                 updatePlayerData(currentID, "playerStats", userData);
@@ -121,9 +382,13 @@ function getPlayerData(playFabId, key){
 function getPlayerDataAsObject(playFabId, key){
     var playerData = server.GetUserData({"Keys": [key], "PlayFabId": playFabId});
     
-    var value = JSON.parse(playerData.Data[new String(key)].Value);
-    
-    return value;
+    try{
+        var value = JSON.parse(playerData.Data[new String(key)].Value);
+        return value;
+    }
+    catch{
+        return null;
+    }
 }
 
 function getPlayerReadData(playFabId, key){
@@ -137,6 +402,7 @@ function getPlayerReadDataAsObject(playFabId, key){
 handlers.getPlayerForSabotage = function (args, context){
     var randomPlayfabId;
     var randomPlayerGold;
+    var randomPlayerInfo;
     var randomPlayerName;
     var randomPlayerFort;
     
@@ -168,13 +434,17 @@ handlers.getPlayerForSabotage = function (args, context){
     
     randomPlayerGold = JSON.parse(getPlayerData(randomPlayfabId, "playerStats").Data.playerStats.Value).coins;
     
-    randomPlayerName = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId }).UserInfo.TitleInfo.DisplayName;
+    randomPlayerInfo = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId });
+    
+    randomPlayerName = getFacebookName(randomPlayerInfo) ? getFacebookName(randomPlayerInfo) : "Anonimus";
     
     randomPlayerFort = JSON.parse(getPlayerData(randomPlayfabId, "forts").Data.forts.Value);
     
+    var currentFortID = getCurrentFortID(randomPlayerFort);
+    
     updatePlayerInternalData(randomPlayfabId, currentPlayerId, { gold : randomPlayerGold });
     
-    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[0]} };
+    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[currentFortID]} };
 };
 
 handlers.stealMoneyFromPlayer = function (args, context){
@@ -582,12 +852,21 @@ function dateTODateTime(){
     
     return time;
 }
+
+function getCurrentFortID(forts){
+    for(let i = 0; i < forts.length; i++){
+        if(!forts[i].isCompleteFort){
+            return forts[i].fortID;
+        }
+    }
+}
     
 handlers.getPlayerForInvasion = function (args, context){
     var maxStarsInChapter = 25;
     var randomPlayfabId;
     var randomPlayerFort;
     var currentFort = 0;
+    var randomPlayerInfo;
     var randomPlayerName;
     var isProtected = false;
     
@@ -599,14 +878,11 @@ handlers.getPlayerForInvasion = function (args, context){
     
     var randomPlayerIndex = getRandomInt(playerCount);
     
-    log.debug(randomPlayerIndex);
-    
     var badPlayersIndexs = [];
     
     if(playerCount > 1){
         for(let i = 0; i < playerCount; i++){
             if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId != currentPlayerId){
-                log.debug(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue);
                 randomPlayfabId = leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].PlayFabId;
                 
                 if(leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue > 0 && (leaderBoardAroundPlayer.Leaderboard[randomPlayerIndex].StatValue != maxStarsInChapter 
@@ -637,25 +913,17 @@ handlers.getPlayerForInvasion = function (args, context){
         return { result: null };
     }
     
-    randomPlayerName = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId }).UserInfo.TitleInfo.DisplayName;
+    randomPlayerInfo = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId });
+    
+    randomPlayerName = getFacebookName(randomPlayerInfo) ? getFacebookName(randomPlayerInfo) : "Anonimus";
     
     var protectionResult = handlers.getProtection({currentID : randomPlayfabId});
-    
-    log.debug(protectionResult.result);
     
     randomPlayerFort = protectionResult.result;
     
     isProtected = protectionResult.outValue;
     
-    /*if(randomPlayerFort[currentFort].serverProtectionStartDate != null){
-        log.debug("serverProtectionStartDate");
-        if(timeSpan(new Date(), new Date(JSON.parse(randomPlayerFort[currentFort].serverProtectionStartDate))).hours < 8){
-            log.debug("timeSpan");
-            isProtected = true;
-        }
-    }*/
-    
-    //updatePlayerInternalData(randomPlayfabId, currentPlayerId, { Invader : currentPlayerId });
+    currentFort = getCurrentFortID(randomPlayerFort);
     
     return { result : {playerID : randomPlayfabId, isProtected : isProtected, fortName : randomPlayerName, fort : randomPlayerFort[currentFort]}, outValue : JSON.stringify(getInvaders(currentPlayerId)) };
 };
@@ -669,6 +937,7 @@ handlers.getPlayerForRevenge = function (args, context){
     var isProtected = false;
     var invaders = [];
     var stars = getFortsStars(playerFort);
+    var randomPlayerInfo;
     
     log.debug("stars: " + stars);
     
@@ -682,7 +951,9 @@ handlers.getPlayerForRevenge = function (args, context){
     }
     
     //playerFort = getPlayerDataAsObject(playerID, "forts");
-    playerName = server.GetUserAccountInfo({ "PlayFabId" : playerID }).UserInfo.TitleInfo.DisplayName;
+    randomPlayerInfo = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId });
+    
+    playerName = getFacebookName(randomPlayerInfo) ? getFacebookName(randomPlayerInfo) : "Anonimus";
     
     for(let i = invaders.length - 1; i >= 0; i--){
         log.debug("id: " + invaders[i].id);
@@ -706,11 +977,7 @@ handlers.getPlayerForRevenge = function (args, context){
     
     updatePlayerReadOnlyData(currentID, "invaders", invaders);
     
-    /*if(playerFort[currentFort].serverProtectionStartData != null){
-        if(timeSpan(new Date(), new Date(JSON.parse(playerFort[currentFort].serverProtectionStartData))).hours < 8){
-            isProtected = true;
-        }
-    }*/
+    currentFort = getCurrentFortID(playerFort);
     
     return {result : {playerID : playerID, isProtected : isProtected, fortName: playerName, fort : playerFort[currentFort]}, outValue : JSON.stringify(invaders) };
 }
@@ -719,6 +986,10 @@ handlers.damageBuilding = function (args, context){
     var currentID = currentPlayerId;
     var playerID = args.playerID;
     var playerFort = JSON.parse(getPlayerData(playerID, "forts").Data.forts.Value);
+    var userData = getPlayerDataAsObject(currentID, "playerStats");
+    var reward = getServerDataAsObject("gameParams").find(e => e.name == "invasionReward").value;
+    
+    log.debug("reward: " + reward);
     
     if(playerFort[args.fortID].buildings[args.buildingID].wear < 3){
         playerFort[args.fortID].buildings[args.buildingID].wear += args.multiplier;
@@ -733,11 +1004,17 @@ handlers.damageBuilding = function (args, context){
         }
     }
     
+    userData.coins += reward * args.multiplier;
+    
     setNews(currentID, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
+    
+    updatePlayerData(currentID, "playerStats", userData);
     
     updatePlayerData(playerID, "forts", playerFort);
     
     setInvader(currentID, playerID, args.stars);
+    
+    return {result : JSON.stringify(userData)};
 }
 
 function getInvaders(playerID){
@@ -845,7 +1122,7 @@ handlers.getEnemiesData = function(args, context){
 }
 
 handlers.getGameProperties = function(args, context){
-    return {result : {upgradesList : createUpgradesList()}};
+    return {result : {upgradesList : createUpgradesList(), gameParams : getServerDataAsObject("gameParams")}};
 }
 
 function createUpgradesList(){
