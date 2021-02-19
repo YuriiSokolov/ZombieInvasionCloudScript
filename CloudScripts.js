@@ -161,13 +161,14 @@ handlers.minusEnergy = function (args, context){
     if(args.energyMode && energy.currentEnergy >= args.energyMode){
         energy.currentEnergy -= args.energyMode;
             
-        if(energy.lastEnergyUseDate == null)
+        if(energy.lastEnergyUseDate == null && energy.currentEnergy < maxEnergy){
             energy.lastEnergyUseDate = JSON.stringify(new Date());
             
-            
-        timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+            timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
         
-        energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+            energy.currentAddEnergyTimer = addEnergyTimer * (1 - ((timeAfterFirstEnergyUse / addEnergyTimer) % 1));
+        }
+        
         energy.addEnergyTimer = addEnergyTimer;
         
         updatePlayerData(currentID, "energy", energy);
@@ -200,6 +201,11 @@ handlers.addEnergy = function (args, context){
     if(args){
         if(args.energyCount){
             energy.currentEnergy += args.energyCount;
+            
+            if(energy.currentEnergy >= maxEnergy){
+                energy.currentAddEnergyTimer = addEnergyTimer;
+                energy.lastEnergyUseDate = null;
+            }
             
             updatePlayerData(currentID, "energy", energy);
             
@@ -333,18 +339,20 @@ handlers.getSpinThingID = function (args, context){
                     updatePlayerStatistics(currentID, "gold", userData.coins);
                 }
                 else if(getTitleData[i].id == "energy"){
-                    var energy = getPlayerDataAsObject(currentID, "energy");
+                    //var energy = getPlayerDataAsObject(currentID, "energy");
                     
                     if(!args || !args.isX2Spin){
-                        energy.currentEnergy += getTitleData[i].addresourceenergy;
+                        //energy.currentEnergy += getTitleData[i].addresourceenergy;
+                        handlers.addEnergy({energyCount : getTitleData[i].addresourceenergy});
                         log.debug({addEnergy : getTitleData[i].addresourceenergy});
                     }
                     else{
-                        energy.currentEnergy += 2 * getTitleData[i].addresourceenergy;
+                        //energy.currentEnergy += 2 * getTitleData[i].addresourceenergy;
+                        handlers.addEnergy({energyCount : 2 * getTitleData[i].addresourceenergy});
                         log.debug({addEnergy :(2 * getTitleData[i].addresourceenergy)});
                     }
                     
-                    updatePlayerData(currentID, "energy", energy);
+                    //updatePlayerData(currentID, "energy", energy);
                 }
                 
                 updatePlayerData(currentID, "playerStats", userData);
@@ -526,6 +534,27 @@ function updatePlayerStatistics(playFabId, key, value){
     server.UpdatePlayerStatistics({PlayFabId : playFabId, Statistics: [{"StatisticName" : new String(key), "Value" : JSON.stringify(value)}]});
 }
 
+function isQuestDataAndProgressSync(quests, progress){
+    var foundQuestValue = 0;
+    var questsList = quests.questList;
+    
+    for(let i = 0; i < questsList.length; i++){
+        for(let j = 0; j < progress.length; j++){
+            
+            if(questsList[i].localizationenname == progress[j].questName){
+                foundQuestValue++;
+                break;
+            }
+        }
+    }
+    
+    if(foundQuestValue != questsList.length){
+        return false;
+    }
+    
+    return true;
+}
+
 handlers.getDailyChallenges = function (args, context){
     var currentID = currentPlayerId;
     
@@ -544,9 +573,8 @@ handlers.getDailyChallenges = function (args, context){
         
         playerData = userDailyQuests;
         questsProgress = getPlayerDataAsObject(currentID, "questsProgress");
-        updatePlayerData(currentID, "questsProgress", questsProgress);
         
-        if(timeSpan(new Date(), new Date(JSON.parse(userDailyQuests.updateQuestDate))).hours >= 24){
+        if(timeSpan(new Date(), new Date(JSON.parse(userDailyQuests.updateQuestDate))).hours >= 24 || !isQuestDataAndProgressSync(userDailyQuests, questsProgress)){
             log.debug(">=24");
             userDailyQuests = getThreeQuests(dailyQuestsList);
             questsProgress = initQuestsProgressModel(userDailyQuests);
@@ -954,7 +982,7 @@ handlers.getPlayerForRevenge = function (args, context){
     }
     
     //playerFort = getPlayerDataAsObject(playerID, "forts");
-    randomPlayerInfo = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId });
+    randomPlayerInfo = server.GetUserAccountInfo({ "PlayFabId" : playerID });
     
     playerName = getFacebookName(randomPlayerInfo) ? getFacebookName(randomPlayerInfo) : "Anonimus";
     
@@ -987,35 +1015,38 @@ handlers.getPlayerForRevenge = function (args, context){
 
 handlers.damageBuilding = function (args, context){
     var currentID = currentPlayerId;
-    var playerID = args.playerID;
-    var playerFort = JSON.parse(getPlayerData(playerID, "forts").Data.forts.Value);
+    
     var userData = getPlayerDataAsObject(currentID, "playerStats");
     var reward = getServerDataAsObject("gameParams").find(e => e.name == "invasionReward").value;
     
-    log.debug("reward: " + reward);
+    if(args.playerID){
+        var playerID = args.playerID;
+        var playerFort = JSON.parse(getPlayerData(playerID, "forts").Data.forts.Value);
     
-    if(playerFort[args.fortID].buildings[args.buildingID].wear < 3){
-        playerFort[args.fortID].buildings[args.buildingID].wear += args.multiplier;
+        log.debug("reward: " + reward);
+    
+        if(playerFort[args.fortID].buildings[args.buildingID].wear < 3){
+            playerFort[args.fortID].buildings[args.buildingID].wear += args.multiplier;
         
-        if(playerFort[args.fortID].buildings[args.buildingID].wear >= 3){
-            playerFort[args.fortID].buildings[args.buildingID].wear = 0;
+            if(playerFort[args.fortID].buildings[args.buildingID].wear >= 3){
+                playerFort[args.fortID].buildings[args.buildingID].wear = 0;
             
-            if(playerFort[args.fortID].buildings[args.buildingID].lvl > 0){
-                playerFort[args.fortID].buildings[args.buildingID].lvl = 0;
-                server.UpdatePlayerStatistics({PlayFabId : playerID, Statistics: [{"StatisticName" : "fortStars", "Value" : getFortsStars(playerFort)}]});
+                if(playerFort[args.fortID].buildings[args.buildingID].lvl > 0){
+                    playerFort[args.fortID].buildings[args.buildingID].lvl = 0;
+                    server.UpdatePlayerStatistics({PlayFabId : playerID, Statistics: [{"StatisticName" : "fortStars", "Value" : getFortsStars(playerFort)}]});
+                }
             }
         }
+    
+        setNews(currentID, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
+    
+        updatePlayerData(playerID, "forts", playerFort);
+    
+        setInvader(currentID, playerID, args.stars);
     }
     
     userData.coins += reward * args.multiplier;
-    
-    setNews(currentID, playerID, "invasion", playerFort[args.fortID].buildings[args.buildingID].name);
-    
     updatePlayerData(currentID, "playerStats", userData);
-    
-    updatePlayerData(playerID, "forts", playerFort);
-    
-    setInvader(currentID, playerID, args.stars);
     
     return {result : JSON.stringify(userData)};
 }
@@ -1146,5 +1177,147 @@ function createUpgradesList(){
     }
     
     return upgradesList;
+}
+
+//==========[Gifts]=========================
+function createGift(from, to, gift){
+    var friendGiftsData = [];
+    
+    try{
+        friendGiftsData = getPlayerReadDataAsObject(to, "Gifts");
+        
+        if(friendGiftsData.length > 0){
+            gift.id = friendGiftsData[friendGiftsData.length - 1].id + 1;
+        }
+        else{
+            gift.id = 0;
+        }
+    }
+    catch{
+        log.debug("Gifts not found");
+        friendGiftsData = [];
+        gift.id = 0;
+    }
+    finally{
+        gift.from = from;
+        friendGiftsData.push(gift);
+    }
+    
+    updatePlayerReadOnlyData(to, "Gifts", friendGiftsData);
+}
+
+handlers.sendGift = function(args, context){
+    var currentID = currentPlayerId;
+    var friendID;
+    var gift = {};
+    var playerData = getPlayerDataAsObject(currentID, "playerStats");
+    
+    if(args){
+        friendID = args.playfabID;
+        gift = args.gift;
+        
+        switch(gift.type){
+            case "gold":
+                if(playerData.coins >= gift.value){
+                    playerData.coins -= gift.value;
+                    createGift(currentID, friendID, gift);
+                    updatePlayerData(currentID, "playerStats", playerData);
+                    return {result : playerData};
+                }
+                else{
+                    return null;
+                }
+            default:
+                return null;
+        }
+    }
+    else{
+        return null;
+    }
+}
+
+handlers.getGifts = function(args, context){
+    var currentID = currentPlayerId;
+    var gifts = [];
+    
+    try{
+        gifts = getPlayerReadDataAsObject(currentID, "Gifts");
+    }
+    catch{
+        log.debug("Gifts not found");
+        gifts = [];
+        updatePlayerReadOnlyData(currentID, "Gifts", gifts);
+    }
+    finally{
+        return {result : gifts};
+    }
+}
+
+handlers.openGift = function(args, context){
+    var currentID = currentPlayerId;
+    var gift;
+    var playerData;
+    var giftsData = getPlayerReadDataAsObject(currentID, "Gifts");
+    
+    if(args){
+        gift = args.gift;
+        
+        switch(gift.type){
+            case "gold":
+                playerData = getPlayerDataAsObject(currentID, "playerStats");
+                playerData.coins += gift.value;
+                updatePlayerData(currentID, "playerStats", playerData);
+                giftsData.splice(giftsData.indexOf(giftsData.find(e => e.id == gift.id)), 1);
+                updatePlayerReadOnlyData(currentID, "Gifts", giftsData);
+                return {result : playerData, outValue : giftsData};
+            default:
+                return null;
+        }
+    }
+    else{
+        return null;
+    }
+}
+
+handlers.openAllGifts = function(args, context){
+    var currentID = currentPlayerId;
+    var gifts = getPlayerReadDataAsObject(currentID, "Gifts");
+    var assortedGifts = {};
+    var playerStats;
+    
+    for(let i = 0; i < gifts.length; i++){
+        
+        switch(gifts[i].type){
+            case "gold":
+                log.debug("gold " + gifts[i].value);
+                if(assortedGifts.gold){
+                    assortedGifts.gold += new Number(gifts[i].value);
+                }
+                else{
+                    assortedGifts.gold = new Number(gifts[i].value);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    
+    log.debug(assortedGifts);
+    
+    if(assortedGifts.gold && assortedGifts.gold > 0){
+        playerStats = getPlayerDataAsObject(currentID, "playerStats");
+        playerStats.coins += assortedGifts.gold;
+        updatePlayerData(currentID, "playerStats", playerStats);
+    }
+    
+    if(!assortedGifts){
+        return null;
+    }
+    else{
+        gifts = [];
+        updatePlayerReadOnlyData(currentID, "Gifts", gifts);
+    }
+    
+    return {result : playerStats};
 }
 
