@@ -1156,7 +1156,7 @@ handlers.getEnemiesData = function(args, context){
 }
 
 handlers.getGameProperties = function(args, context){
-    return {result : {upgradesList : createUpgradesList(), gameParams : getServerDataAsObject("gameParams")}};
+    return {result : {upgradesList : createUpgradesList(), gameParams : getServerDataAsObject("gameParams"), giftsTypes : getServerDataAsObject("GiftsTypes")}};
 }
 
 function createUpgradesList(){
@@ -1182,6 +1182,7 @@ function createUpgradesList(){
 //==========[Gifts]=========================
 function createGift(from, to, gift){
     var friendGiftsData = [];
+    var yourInfo = server.GetUserAccountInfo({ "PlayFabId" : from });
     
     try{
         friendGiftsData = getPlayerReadDataAsObject(to, "Gifts");
@@ -1199,7 +1200,7 @@ function createGift(from, to, gift){
         gift.id = 0;
     }
     finally{
-        gift.from = from;
+        gift.from = getFacebookName(yourInfo) ? getFacebookName(yourInfo) : "Anonimus";
         friendGiftsData.push(gift);
     }
     
@@ -1269,6 +1270,7 @@ handlers.openGift = function(args, context){
                 updatePlayerData(currentID, "playerStats", playerData);
                 giftsData.splice(giftsData.indexOf(giftsData.find(e => e.id == gift.id)), 1);
                 updatePlayerReadOnlyData(currentID, "Gifts", giftsData);
+                log.debug(giftsData);
                 return {result : playerData, outValue : giftsData};
             default:
                 return null;
