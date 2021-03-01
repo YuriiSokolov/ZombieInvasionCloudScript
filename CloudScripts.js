@@ -1,17 +1,79 @@
-handlers.helloWorld = function (args, context) {    
-    var message = "Hello " + currentPlayerId + "!";
-
-    log.info(message);
-    var inputValue = null;
-    if (args && args.inputValue){
-        inputValue = args.inputValue;
-        message += " " + inputValue;
-    }
-        
-    log.debug("helloWorld:", { input: args.inputValue });
-
-    return { result: message };
+function getServerData (key){
+    return server.GetTitleInternalData({ "Keys": [new String(key)] });
 };
+
+function getServerDataAsObject (key, isArray = false){
+    
+    var getTitleData;
+    
+    var value;
+    
+    if(!isArray){
+        getTitleData = server.GetTitleInternalData({ "Keys": [new String(key)] });
+        value = JSON.parse(getTitleData.Data[new String(key)]);
+    }
+    else{
+        getTitleData = server.GetTitleInternalData({ "Keys": key });
+        value = getTitleData.Data;
+    }
+    
+    return value;
+};
+
+function getPlayerData(playFabId, key){
+    var getPlayerDataRequest = {"Keys": [key], "PlayFabId": playFabId};
+    
+    var playerData = server.GetUserData(getPlayerDataRequest);
+    
+    return playerData;
+}
+
+function getPlayerDataAsObject(playFabId, key, isArray = false){
+    var playerData;
+    
+    if(!isArray){
+        try{
+            playerData = server.GetUserData({"Keys": [key], "PlayFabId": playFabId});
+            var value = JSON.parse(playerData.Data[new String(key)].Value);
+            return value;
+        }
+        catch{
+            return null;
+        }
+    }
+    else{
+        try{
+            playerData = server.GetUserData({"Keys": key, "PlayFabId": playFabId});
+            var value = playerData.Data;
+            return value;
+        }
+        catch{
+            return null;
+        }
+    }
+}
+
+function mixingArray(array){
+    for(let i = array.length - 1; i >= 0; i--){
+        var j = getRandomInt(array.length);
+        
+        var tmp = array[j];
+        array[j] = array[i];
+        array[i] = tmp;
+    }
+    
+    return array;
+}
+
+function arrayValuesSum(array){
+    var value = 0;
+    
+    for(let i = 0; i < array.length; i++){
+        value += array[i];
+    }
+    
+    return value;
+}
 
 function getRandomInt(max) {
   return Math.floor(Math.random() * Math.floor(max));
@@ -110,7 +172,14 @@ handlers.getEnergy = function (args, context){
     if(energy){
         if(energy.currentEnergy < maxEnergy){
         
-            var timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+            var timeAfterFirstEnergyUse;
+            
+            if(energy.lastEnergyUseDate != null){
+                timeAfterFirstEnergyUse = timeSpan(new Date(), new Date(JSON.parse(energy.lastEnergyUseDate))).seconds;
+            }
+            else{
+                timeAfterFirstEnergyUse = maxEnergy * addEnergyTimer;
+            }
         
             log.debug("addEnergyTimer " + addEnergyTimer);
             
@@ -370,38 +439,6 @@ handlers.getSpinThings = function (args, context){
     return {result : JSON.stringify(getServerDataAsObject("rouletteData"))};
 }
 
-function getServerData (key){
-    return server.GetTitleInternalData({ "Keys": [new String(key)] });
-};
-
-function getServerDataAsObject (key){
-    var getTitleData = server.GetTitleInternalData({ "Keys": [new String(key)] });
-    
-    var value = JSON.parse(getTitleData.Data[new String(key)]);
-    
-    return value;
-};
-
-function getPlayerData(playFabId, key){
-    var getPlayerDataRequest = {"Keys": [key], "PlayFabId": playFabId};
-    
-    var playerData = server.GetUserData(getPlayerDataRequest);
-    
-    return playerData;
-}
-
-function getPlayerDataAsObject(playFabId, key){
-    var playerData = server.GetUserData({"Keys": [key], "PlayFabId": playFabId});
-    
-    try{
-        var value = JSON.parse(playerData.Data[new String(key)].Value);
-        return value;
-    }
-    catch{
-        return null;
-    }
-}
-
 function getPlayerReadData(playFabId, key){
     return server.GetUserReadOnlyData({PlayFabId : playFabId, Keys : [key]});
 }
@@ -411,11 +448,21 @@ function getPlayerReadDataAsObject(playFabId, key){
 }
 
 handlers.getPlayerForSabotage = function (args, context){
+    var currentID = currentPlayerId;
+    
+    var randomPlayer;
     var randomPlayfabId;
     var randomPlayerGold;
     var randomPlayerInfo;
     var randomPlayerName;
     var randomPlayerFort;
+    var randomPlayerStats;
+    
+    var gameParams = getServerDataAsObject("ServerParams");
+    var sabotageValues = JSON.parse(gameParams.find(e => e.name == "sabotageValues").value);
+    
+    sabotageValues = mixingArray(sabotageValues);
+    sabotageValues.splice(3, 2);
     
     var getLeaderboardAroundPlayerRequest = { "MaxResultsCount" : 100, "StatisticName" : "gold", "PlayFabId" : currentPlayerId };
     
@@ -443,67 +490,66 @@ handlers.getPlayerForSabotage = function (args, context){
         return { result: null };
     }
     
-    randomPlayerGold = JSON.parse(getPlayerData(randomPlayfabId, "playerStats").Data.playerStats.Value).coins;
+    randomPlayer = getPlayerDataAsObject(randomPlayfabId, new Array("playerStats", "forts"), true);
+
+    randomPlayerStats = JSON.parse(randomPlayer["playerStats"].Value);
+
+    var stealValue = Math.floor(randomPlayerStats.coins * arrayValuesSum(sabotageValues));
+    
+    randomPlayerGold = randomPlayerStats.coins;
     
     randomPlayerInfo = server.GetUserAccountInfo({ "PlayFabId" : randomPlayfabId });
     
     randomPlayerName = getFacebookName(randomPlayerInfo) ? getFacebookName(randomPlayerInfo) : "Anonimus";
     
-    randomPlayerFort = JSON.parse(getPlayerData(randomPlayfabId, "forts").Data.forts.Value);
+    randomPlayerFort = JSON.parse(randomPlayer["forts"].Value);
     
     var currentFortID = getCurrentFortID(randomPlayerFort);
     
-    updatePlayerInternalData(randomPlayfabId, currentPlayerId, { gold : randomPlayerGold });
+    updatePlayerInternalData(currentID, randomPlayfabId, { gold : stealValue });
+
+    //Steal money from player
+    randomPlayerStats.coins -= stealValue;
+    updatePlayerData(randomPlayfabId, "playerStats", randomPlayerStats);
+    setNews(currentID, randomPlayfabId, "steal", stealValue);
+    //=======================
     
-    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[currentFortID]} };
+    return { result : {playerID : randomPlayfabId, fortMoney : randomPlayerGold, fortName : randomPlayerName, fort : randomPlayerFort[currentFortID], sabotageValues : sabotageValues} };
 };
 
 handlers.stealMoneyFromPlayer = function (args, context){
     var currentID = currentPlayerId;
+    
     var randomPlayfabId;
-    var userInternalData;
-    var goldBeforeSteal;
-    var maxStealGold;
     var gold;
-    var userData;
-    var userStats;
+    
+    var userInternalData;
+    var playerStats = getPlayerDataAsObject(currentID, "playerStats");
+    
+    var canStealGoldValue;
     
     if(args){
         if(args.playFabId && args.gold){
             randomPlayfabId = args.playFabId;
             gold = args.gold;
             
-            userInternalData = server.GetUserInternalData({ Keys: [currentID], PlayFabId : randomPlayfabId });
+            userInternalData = server.GetUserInternalData({ Keys: [randomPlayfabId], PlayFabId : currentPlayerId });
             
-            goldBeforeSteal = JSON.parse(userInternalData.Data[currentID].Value).gold;
-            maxStealGold = Math.floor(0.25 * goldBeforeSteal);
+            canStealGoldValue = JSON.parse(userInternalData.Data[randomPlayfabId].Value).gold;
             
-            if(gold <= maxStealGold){
-                userData = server.GetUserData({Keys: ["playerStats"], PlayFabId : randomPlayfabId});
-                userStats = JSON.parse(userData.Data.playerStats.Value);
-                
-                if(userStats.coins >= gold){
-                    userStats.coins -= gold;
-                }
-                else{
-                    userStats.coins = 0;
-                }
-                
-                userData = updatePlayerData(randomPlayfabId, "playerStats", userStats);
-                
-                var statsCoins = 0;
-                statsCoins = userStats.coins;
-                
-                server.UpdatePlayerStatistics({PlayFabId : randomPlayfabId, Statistics: [{"StatisticName" : "gold", "Value" : statsCoins}]});
-                
-                updatePlayerInternalData(randomPlayfabId, currentID, null);
-                
-                setNews(currentID, randomPlayfabId, "steal", gold);
+            if(gold <= canStealGoldValue){
+                playerStats.coins += gold;
+                updatePlayerData(currentID, "playerStats", playerStats);
             }
+            else{
+                log.debug("Cheater!!!");
+            }
+            
+            updatePlayerInternalData(currentID, randomPlayfabId, null);
         }
     }
     
-    return {result : userData};
+    return {result : playerStats};
 }
 
 function updatePlayerData(playFabId, key, value){
@@ -1156,7 +1202,14 @@ handlers.getEnemiesData = function(args, context){
 }
 
 handlers.getGameProperties = function(args, context){
-    return {result : {upgradesList : createUpgradesList(), gameParams : getServerDataAsObject("gameParams"), giftsTypes : getServerDataAsObject("GiftsTypes")}};
+    var serverData = getServerDataAsObject(["gameParams", "GiftsTypes", "Store"], true);
+    
+    return {result : {  upgradesList : createUpgradesList(), 
+                        gameParams : JSON.parse(serverData["gameParams"]), 
+                        giftsTypes : JSON.parse(serverData["GiftsTypes"]), 
+                        storeData : JSON.parse(serverData["Store"])
+                     }
+            };
 }
 
 function createUpgradesList(){
@@ -1322,4 +1375,34 @@ handlers.openAllGifts = function(args, context){
     
     return {result : playerStats};
 }
+
+//============[In App Purchase]==========================
+handlers.getPurchase = function(args, context){
+    var currentID = currentPlayerId;
+    var id = args.id;
+    var date = args.date;
+    var storeData = getServerDataAsObject("Store");
+    var thing;
+    var playerData;
+    
+    log.debug("PurchaseID: " + args.id + " Date: " + date);
+    
+    thing = storeData.find(e => e.id == id);
+    
+    log.debug(thing);
+    
+    switch(thing.type){
+        case "gold":
+            playerData = getPlayerDataAsObject(currentID, "playerStats");
+            playerData.coins += thing.value;
+            updatePlayerData(currentID, "playerStats", playerData);
+            return {result : playerData, outValue : "gold"};
+        case "energy":
+            handlers.addEnergy({energyCount : thing.value});
+            return {result : getPlayerDataAsObject(currentID, "energy"), outValue : "energy"};
+    }
+    
+    return {result : null};
+}
+//=======================================================
 
