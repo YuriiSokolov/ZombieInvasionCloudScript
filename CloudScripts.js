@@ -1,3 +1,102 @@
+class myRandom{
+    constructor(seed){
+        this.seed = new Number(seed);
+        this.prev = this.seed;
+    }
+    
+    get getSeed(){
+        return this.seed;
+    }
+    
+    get randInt(){
+        return this.next();
+    }
+    
+    get randFloat(){
+        return this.next() / 0x7fff;
+    }
+    
+    next(){
+        var value = ((this.prev * 20077) + 12345) & 0x7fff;
+        this.prev = value;
+        
+        return value;
+    }
+    
+    range(min, max){
+        var value = this.next() % (max - min) + min;
+        return value;
+    }
+}
+
+function getSeed(seed){
+    var seeds = [695, 175, 993, 505, 46, 705, 399, 315, 632, 859, 247, 516, 968, 19, 251, 786, 830, 559, 517, 445, 41, 716, 
+                 921, 504, 753, 276, 106, 571, 85, 446, 22, 740, 741, 153, 658, 717, 765, 999, 916, 266, 584, 796, 401, 654, 
+                 186, 48, 316, 668, 973, 883, 520, 876, 885, 839, 856, 849, 706, 489, 751, 438, 140, 359, 127, 694, 799, 661, 
+                 395, 96, 305, 729, 60, 343, 89, 610, 84, 497, 547, 744, 128, 174, 1018, 225, 892, 676, 253, 824, 418, 903, 948, 
+                 586, 403, 257, 627, 11, 262, 683, 766, 792, 907, 146, 652, 185, 670, 939, 449, 873, 825, 227, 761, 645, 813, 928, 
+                 978, 746, 7, 954, 355, 782, 515, 284, 711, 463, 367, 685, 300, 840, 278, 199, 119, 787, 703, 15, 901, 669, 616, 328, 
+                 104, 342, 49, 68, 0, 544, 763, 214, 909, 964, 441, 726, 882, 690, 754, 129, 13, 707, 397, 731, 63, 875, 843, 828, 301, 
+                 861, 835, 566, 183, 640, 638, 674, 390, 732, 160, 197, 881, 404, 295, 152, 509, 303, 248, 546, 728, 734, 406, 32, 598, 
+                 74, 872, 621, 293, 942, 949, 629, 806, 335, 538, 133, 302, 223, 108, 958, 823, 922, 609, 494, 523, 589, 548, 941, 230, 
+                 345, 990, 822, 723, 781, 772, 255, 923, 679, 427, 713, 969, 929, 952, 562, 646, 905, 853, 201, 514, 396, 827, 386, 437, 
+                 988, 206, 764, 195, 563, 109, 289, 708, 341, 848, 75, 325, 701, 314, 774, 121, 596, 704, 675, 298, 91, 975, 895, 902, 111, 
+                 700, 368, 696, 719, 553, 479, 837, 279, 408, 2, 350, 352, 560, 671, 452, 554, 585, 271, 583, 158, 532, 633, 360, 481, 273, 
+                 531, 567, 996, 877, 90, 771, 603, 231, 508, 816, 1016, 443, 151, 519, 869, 857, 256, 894, 752, 946, 805, 770, 747, 636, 170, 
+                 910, 29, 184, 113, 393, 1019, 101, 51, 37, 592, 971, 854, 606, 447, 1017, 238, 914, 613, 635, 998, 491, 117, 684, 40, 693, 
+                 351, 205, 791, 543, 363, 760, 776, 232, 138, 1009, 383, 224, 961, 507, 620, 537, 116, 92, 358, 366, 617, 379, 755, 361, 423, 
+                 818, 282, 811, 963, 663, 987, 233, 26, 415, 277, 551, 132, 178, 323, 915, 480, 461, 534, 264, 464, 495, 86, 1012, 311, 476, 656, 
+                 867, 865, 555, 155, 213, 578, 320, 911, 528, 798, 469, 634, 769, 456, 720, 1008, 1023, 758, 322, 650, 169, 477, 775, 250, 249, 580, 
+                 641, 518, 870, 724, 657, 42, 394, 951, 500, 614, 644, 147, 431, 659, 890, 862, 200, 299, 745, 38, 855, 221, 625, 486, 667, 470, 599, 
+                 970, 762, 812, 992, 594, 69, 378, 193, 540, 220, 450, 376, 545, 59, 191, 291, 607, 595, 64, 460, 83, 924, 593, 8, 590, 387, 927, 527, 
+                 615, 983, 204, 1021, 30, 863, 767, 521, 981, 991, 391, 260, 118, 156, 972, 110, 682, 709, 880, 5, 261, 678, 619, 655, 385, 574, 
+                 462, 281, 347, 202, 354, 131, 124, 263, 953, 492, 326, 215, 933, 956, 357, 157, 847, 168, 280, 483, 821, 99, 1003, 665, 162, 52, 565, 
+                 541, 597, 259, 372, 285, 793, 549, 34, 405, 306, 838, 130, 874, 899, 340, 240, 664, 292, 102, 976, 288, 93, 777, 327, 159, 511, 442, 896, 
+                 898, 4, 417, 409, 287, 780, 329, 192, 336, 681, 286, 16, 844, 348, 365, 943, 94, 332, 283, 459, 333, 45, 100, 556, 913, 995, 297, 53, 1004, 
+                 313, 819, 810, 380, 274, 33, 564, 794, 339, 217, 412, 381, 722, 587, 243, 841, 697, 308, 414, 503, 472, 356, 66, 912, 773, 789, 144, 136, 721, 
+                 58, 790, 189, 845, 966, 919, 677, 436, 979, 107, 730, 1014, 783, 750, 906, 557, 513, 490, 795, 842, 739, 430, 143, 95, 36, 989, 582, 210, 
+                 735, 506, 637, 642, 888, 426, 177, 622, 416, 725, 338, 267, 425, 413, 814, 577, 81, 402, 748, 980, 448, 904, 691, 608, 784, 662, 536, 212,
+                 630, 14, 573, 120, 145, 499, 686, 47, 820, 71, 296, 959, 689, 467, 468, 82, 957, 236, 737, 475, 389, 18, 803, 962, 484, 736, 272, 228, 10, 
+                 687, 198, 569, 154, 318, 530, 601, 612, 474, 759, 9, 831, 846, 137, 411, 324, 244, 788, 756, 67, 974, 624, 269, 680, 207, 419, 935, 211, 
+                 897, 319, 778, 714, 934, 384, 258, 926, 965, 757, 77, 216, 237, 310, 239, 219, 457, 498, 525, 222, 398, 27, 252, 493, 103, 377, 785, 602, 1001, 
+                 588, 24, 938, 994, 698, 410, 826, 834, 428, 241, 349, 407, 604, 1005, 188, 692, 930, 1007, 727, 194, 647, 809, 142, 62, 424, 80, 908, 688, 581, 
+                 444, 172, 166, 829, 984, 887, 868, 165, 1022, 21, 229, 163, 72, 526, 986, 496, 122, 190, 749, 743, 125, 370, 1002, 535, 65, 832, 1000, 648, 388, 
+                 482, 196, 429, 235, 364, 242, 576, 718, 268, 421, 815, 1010, 290, 550, 817, 226, 524, 982, 871, 382, 542, 321, 400, 126, 148, 852, 371, 
+                 440, 466, 181, 465, 985, 944, 454, 715, 176, 702, 710, 265, 123, 392, 649, 50, 672, 618, 626, 510, 891, 955, 254, 733, 591, 453, 88, 936, 742, 
+                 433, 858, 611, 79, 97, 977, 529, 487, 940, 712, 114, 435, 161, 139, 666, 533, 1013, 1006, 337, 112, 369, 179, 572, 800, 134, 31, 889, 660, 807, 
+                 434, 330, 558, 947, 931, 422, 375, 937, 294, 420, 623, 605, 950, 455, 167, 25, 473, 643, 73, 39, 699, 738, 879, 967, 478, 552, 932, 44, 246, 6, 
+                 309, 353, 768, 1, 373, 960, 631, 307, 485, 1020, 374, 579, 182, 56, 171, 836, 451, 87, 135, 639, 918, 945, 651, 234, 539, 900, 866, 76, 150, 502, 
+                 850, 105, 70, 334, 458, 797, 3, 209, 218, 779, 600, 673, 628, 180, 304, 432, 471, 331, 920, 488, 568, 893, 362, 878, 575, 12, 208, 1011, 925, 141, 
+                 61, 203, 98, 17, 1015, 561, 884, 802, 245, 317, 801, 55, 187, 149, 653, 312, 115, 501, 344, 78, 522, 997, 54, 57, 20, 439, 886, 275, 43, 270, 860, 
+                 35, 804, 808, 570, 23, 833, 164, 851, 512, 173, 864, 28, 917, 346];
+                 
+    return seeds[seed];
+};
+
+function banPlayer(playFabId){
+    var warnNumber = 0;
+    
+    try{
+        warnNumber = server.GetUserInternalData({PlayFabId : playFabId, Keys : ["warn"]}).Data.warn.Value;
+        
+        if(warnNumber){
+            warnNumber++;
+        }
+        else{
+            warnNumber = 1;
+        }
+    }
+    catch{
+        warnNumber = 1;
+    }
+    
+    if(warnNumber >= 3){
+        server.BanUsers({PlayFabId : playFabId, Reason : "Auto BAN! You have a three warns."});
+    }
+    
+    updatePlayerInternalData(playFabId, "warn", warnNumber);
+};
+
 function getServerData (key){
     return server.GetTitleInternalData({ "Keys": [new String(key)] });
 };
@@ -51,6 +150,26 @@ function getPlayerDataAsObject(playFabId, key, isArray = false){
             return null;
         }
     }
+}
+
+function updatePlayerInternalData(playFabId, key, value){
+    var playerData = {};
+    
+    if(value == null){
+        playerData[new String(key)] = null;
+    }
+    else{
+        playerData[new String(key)] = JSON.stringify(value);
+    }
+    
+    var updatePlayerInternalDataRequest = { PlayFabId : playFabId , Data : playerData };
+    var result = server.UpdateUserInternalData(updatePlayerInternalDataRequest);
+    
+    return result;
+}
+
+function updatePlayerStatistics(playFabId, key, value){
+    server.UpdatePlayerStatistics({PlayFabId : playFabId, Statistics: [{"StatisticName" : new String(key), "Value" : JSON.stringify(value)}]});
 }
 
 function mixingArray(array){
@@ -114,6 +233,20 @@ function getFacebookName(playerInfo){
     }
     
     return null;
+}
+
+function getObjectInGameNumber(maxNumbers, probability){
+    var value = 0;
+    
+    for(let i = 0; i < maxNumbers; i++){
+        var currentProbability = Math.random();
+        
+        if(currentProbability < probability){
+            value++;
+        }
+    }
+    
+    return new Number(value);
 }
 
 handlers.deletePlayerData = function (args, context){
@@ -543,6 +676,7 @@ handlers.stealMoneyFromPlayer = function (args, context){
             }
             else{
                 log.debug("Cheater!!!");
+                banPlayer(currentID);
             }
             
             updatePlayerInternalData(currentID, randomPlayfabId, null);
@@ -558,26 +692,6 @@ function updatePlayerData(playFabId, key, value){
     var result = server.UpdateUserData({PlayFabId : playFabId, Data : playerData});
     
     return result;
-}
-
-function updatePlayerInternalData(playFabId, key, value){
-    var playerData = {};
-    
-    if(value == null){
-        playerData[new String(key)] = null;
-    }
-    else{
-        playerData[new String(key)] = JSON.stringify(value);
-    }
-    
-    var updatePlayerInternalDataRequest = { PlayFabId : playFabId , Data : playerData };
-    var result = server.UpdateUserInternalData(updatePlayerInternalDataRequest);
-    
-    return result;
-}
-
-function updatePlayerStatistics(playFabId, key, value){
-    server.UpdatePlayerStatistics({PlayFabId : playFabId, Statistics: [{"StatisticName" : new String(key), "Value" : JSON.stringify(value)}]});
 }
 
 function isQuestDataAndProgressSync(quests, progress){
@@ -826,7 +940,7 @@ handlers.buyUpgrade = function (args, context){
     
     updatePlayerData(currentID, "forts", forts);
     
-    return {result : getPlayerData(currentID, "forts").Data["forts"].Value, tag : building.name};
+    return {result : forts, tag : building.name};
 }
 
 function getUpgradeCost(fortID, buildingID, buildingLvl){
@@ -1202,14 +1316,58 @@ handlers.getEnemiesData = function(args, context){
 }
 
 handlers.getGameProperties = function(args, context){
-    var serverData = getServerDataAsObject(["gameParams", "GiftsTypes", "Store"], true);
+    var serverData = getServerDataAsObject(["gameParams", "GiftsTypes", "Store", "Artefacts", "PlayerStats", "FortificationUpgrades", "ServerParams"], true);
     
     return {result : {  upgradesList : createUpgradesList(), 
                         gameParams : JSON.parse(serverData["gameParams"]), 
                         giftsTypes : JSON.parse(serverData["GiftsTypes"]), 
-                        storeData : JSON.parse(serverData["Store"])
+                        storeData : JSON.parse(serverData["Store"]),
+                        artefacts : JSON.parse(serverData["Artefacts"]),
+                        playerStats : createPlayerModel(JSON.parse(serverData["PlayerStats"])),
+                        upgradesCosts : createUpgradesPriceList(JSON.parse(serverData["FortificationUpgrades"]), JSON.parse(serverData["ServerParams"]))
                      }
             };
+}
+
+function createPlayerModel(data){
+    var playerStats = {};
+    
+    for(let i = 0; i < data.length; i++){
+        playerStats[new String(data[i].name)] = new Number(data[i].value);
+    }
+    
+    return playerStats;
+}
+
+function createUpgradesPriceList(priceData, serverParams){
+    var fortsCount = serverParams.find(e => e.name == "fortsNumber").value;
+    var buildingsCount = serverParams.find(e => e.name == "buildingsInFort").value;
+    var upgradesLvlsNumber = serverParams.find(e => e.name == "upgradesLvlsNumber").value;
+    
+    var index = 0;
+    
+    var upgradesCosts = [];
+    
+    for(let i = 1; i <= fortsCount; i++){
+        upgradesCosts.push({fortID : i - 1});
+        upgradesCosts[i - 1].buildingUpgradesCost = {};
+        
+        for(let j = 0; j < buildingsCount; j++){
+            
+            var buildingUpgradesCost = [];
+            
+            for (let k = 0; k < upgradesLvlsNumber; k++){
+                var rowID = k + (buildingsCount * j);
+
+                buildingUpgradesCost.push(priceData[rowID].payresourcegold);
+            }
+            //buildingUpgradesCost.sort();
+            
+            upgradesCosts[i - 1].buildingUpgradesCost[j] = buildingUpgradesCost;
+        }
+    }
+    
+    return upgradesCosts;
 }
 
 function createUpgradesList(){
@@ -1406,3 +1564,445 @@ handlers.getPurchase = function(args, context){
 }
 //=======================================================
 
+//===================[Main game]=========================
+handlers.getMainGameParams = function(args, context){
+    var currentID = currentPlayerId;
+    var gameParams = getServerDataAsObject("MainGameParams");
+    var seed = getGameSeed(currentID);
+    
+    //===========[Artefacts]==================
+    var maxArtefactsNumber = gameParams.find(p => p.name == "maxArtefactsNumber").value;
+    var artefactsSpawnChance = JSON.parse(gameParams.find(p => p.name == "artefactsAddСhance").value);
+    var artefactsInZombieChance = JSON.parse(gameParams.find(p => p.name == "artefactsInZombieChance").value);
+    var minZombieNumberWithArtefacts = gameParams.find(p => p.name == "minZombieNumberWithArtefacts").value;
+    var artefactsInGame = getObjectInGameNumber(maxArtefactsNumber, artefactsSpawnChance);
+    //========================================
+    
+    //===========[Cards]======================
+    var maxChestsNumber = gameParams.find(p => p.name == "maxChestsNumber").value;
+    var chastInGameChance = JSON.parse(gameParams.find(p => p.name == "chastInGameChance").value);
+    var chestInZombieChance = JSON.parse(gameParams.find(p => p.name == "chestInZombieChance").value);
+    var minZombieWithChest = gameParams.find(p => p.name == "minZombieWithChest").value;
+    var maxChestsNumberInGame = getObjectInGameNumber(maxChestsNumber, chastInGameChance);
+    //========================================
+    
+    updatePlayerInternalData(currentID, "lastGame", {seed : seed, maxArtefactsNumber : artefactsInGame, maxChestsNumber : maxChestsNumberInGame});
+    
+    return {result : {  
+                        seed : seed, 
+                        artefactsInGame : artefactsInGame, 
+                        artefactsChance : artefactsInZombieChance, 
+                        minZombieWithArtefact : minZombieNumberWithArtefacts, 
+                        
+                        minZombieWithChest : minZombieWithChest,
+                        chestInZombieChance : chestInZombieChance,
+                        maxChestsNumber : maxChestsNumberInGame
+                     }};
+}
+
+handlers.checkGameResult = function(args, context){
+    var currentID = currentPlayerId;
+    var playerData = getPlayerDataAsObject(currentID, ["playerStats", "chapters"], true);
+    var playerStats = JSON.parse(playerData["playerStats"].Value);
+    var currentChapterID = JSON.parse(playerData["chapters"].Value).currentChapter.id;
+    
+    var lastGameParams = JSON.parse(server.GetUserInternalData({PlayFabId : currentID, Keys : ["lastGame"]}).Data.lastGame.Value);
+    
+    log.debug(lastGameParams.seed);
+    
+    var serverData = getServerDataAsObject(["Zombies", "ZombiesInChapters"], true);
+    
+    var zombies = JSON.parse(serverData["Zombies"]);
+    var zombiesWeights = JSON.parse(serverData["ZombiesInChapters"]).filter(e => e.chapter == currentChapterID);
+    
+    var zombieTypes = generateZombiesTypes(zombiesWeights, args.zombiesNumber, lastGameParams.seed);
+    var maxGold = maxGoldInRound(zombieTypes, zombies);
+    
+    log.debug({maxGold : maxGold});
+
+    if((args.artefactsNumber > lastGameParams.maxArtefactsNumber) || (args.gold > maxGold * args.energyMode) || (args.chestsNumber > lastGameParams.maxChestsNumber)){
+        log.debug("Cheater!!!");
+        banPlayer(currentID);
+        
+        return null;
+    }
+    else{
+        playerStats.coins += args.gold;
+    }
+    
+    //log.debug("ids : " + args.zombiesIDs);
+    //var goldFromZombies = maxGoldFromZombies(zombieTypes, zombies, args.zombiesIDs);
+    
+    //log.debug({ gold : args.gold, goldFromZombies : goldFromZombies});
+    
+    updatePlayerData(currentID, "playerStats", playerStats);
+    
+    return {result : playerStats};
+}
+
+function generateZombiesTypes(zombies, max, seed){
+    var rand = new myRandom(seed);
+    var types = [];
+    var totalWeight = 0;
+    
+    for(let i = 0; i < zombies.length; i++){
+        totalWeight += zombies[i].weight;
+    }
+    
+    log.debug({totalWeight : totalWeight});
+    
+    for(let i = 0; i < max; i++){
+        var randomNum = rand.range(0, totalWeight);
+        
+        for(let j = 0; j < zombies.length; j++){
+            if(randomNum < zombies[j].weight){
+                types.push(zombies[j].zombie);
+                break;
+            }
+            randomNum -= zombies[j].weight;
+        }
+    }
+    
+    return types;
+}
+
+function maxGoldInRound(zombieTypes, zombiesInfo){
+    var gold = 0;
+    
+    for(let i = 0; i < zombieTypes.length; i++){
+        gold += zombiesInfo.find(e => e.id == zombieTypes[i]).addresourcegold;
+    }
+    
+    return gold;
+}
+
+function maxGoldFromZombies(zombieTypes, zombiesInfo, zombiesIDS){
+    var gold = 0;
+    
+    for(let i = 0; i < zombiesIDS.length; i++){
+        gold += zombiesInfo.find(e => e.id == zombieTypes[zombiesIDS[i]]).addresourcegold;
+    }
+    
+    return gold;
+}
+
+function getGameSeed(playfabID){
+    var seed;
+    
+    try{
+        seed = server.GetUserInternalData({ Keys: ["seed"], PlayFabId : playfabID }).Data.seed.Value;
+        
+        if(seed){
+            seed = getSeed(seed);
+        }
+        else{
+            seed = getSeed(getRandomInt(1023));
+        }
+    }
+    catch{
+        seed = getSeed(getRandomInt(1023));
+    }
+    
+    try{
+        updatePlayerInternalData(playfabID, "seed", seed);
+    }
+    catch{
+        log.debug("Can't save seed");
+    }
+    
+    return seed;
+}
+//=======================================================
+
+//=====================[Cards]===========================
+handlers.getCardsList = function(args, context){
+    var currentID = currentPlayerId;
+    var playerCards = [];
+    var chests = [];
+    var collection = getServerDataAsObject("CardsCollections");
+    var playerCollection = [];
+
+    try{
+        playerCards = getPlayerReadDataAsObject(currentID, "Cards");
+    }
+    catch{
+        playerCards = [];
+        updatePlayerReadOnlyData(currentID, "Cards", playerCards);
+    }
+    
+    try{
+        chests = getPlayerReadDataAsObject(currentID, "Chests");
+    }
+    catch{
+        chests = [];
+        updatePlayerReadOnlyData(currentID, "Chests", chests);
+    }
+    
+    try{
+        playerCollection = getPlayerReadDataAsObject(currentID, "CardsCollections");
+    }
+    catch{
+        playerCollection = [];
+        playerCollection = collection;
+        
+        for(let i = 0; i < playerCollection.length; i++){
+            playerCollection[i].isswapped = false;
+        }
+        
+        updatePlayerReadOnlyData(currentID, "CardsCollections", playerCollection);
+    }
+    
+    return {result : { playerCards : playerCards, chests : chests, collection : playerCollection }};
+}
+
+function getCard(playfabID, cards, playerCards, type){
+    var tempCards;
+    var totalWeight = 0;
+    var cardID;
+    
+    if(type){
+        tempCards = cards.filter(e => e.type == type);
+    }
+    else{
+        tempCards = cards;
+    }
+    
+    for(let i = 0; i < tempCards.length; i++){
+        totalWeight += tempCards[i].rate;
+    } 
+    
+    var randomNum = getRandomInt(totalWeight);
+        
+    for(let j = 0; j < tempCards.length; j++){
+        if(randomNum < tempCards[j].rate){
+            cardID = tempCards[j].id;
+            
+            var card = playerCards.find(e => e.id == cardID);
+            
+            if(card){
+                card.count = card.count ? (card.count + 1) : 1;
+            }
+            else{
+                playerCards.push(tempCards[j]);
+                playerCards[playerCards.length - 1].count = 1;
+            }
+            
+            break;
+        }
+        randomNum -= tempCards[j].rate;
+    }
+    
+    return cardID;
+}
+
+handlers.swapCollection = function(args, context){
+    var currentID = currentPlayerId;
+    var serverData = getServerDataAsObject(["CardsCollections", "CollectionsRewards"], true);
+    var rewards = JSON.parse(serverData["CollectionsRewards"]);
+    var collection = JSON.parse(serverData["CardsCollections"]);
+    var playerCollection = getPlayerReadDataAsObject(currentID, "CardsCollections");
+    var playerCards = getPlayerReadDataAsObject(currentID, "Cards");
+    var collectionID = collection.find(e => e.name == args.collection).id;
+    
+    var playerStats = getPlayerDataAsObject(currentID, "playerStats");
+    
+    var collectionCards = playerCards.filter(e => e.collectionid == collectionID);
+    var reward = rewards.find(e => e.id == collectionID);
+    
+    if(collectionCards.length == collection.find(e => e.id == collectionID).allcardsnumber){
+        
+        if(reward.energyreward && reward.energyreward > 0){
+            handlers.addEnergy({energyCount : reward.energyreward});
+        }
+        
+        deleteCards(playerCards, collectionCards);
+        
+        log.debug(playerCards);
+        
+        playerCollection.find(e => e.id == collectionID).isswapped = true;
+        
+        playerStats.coins += reward.goldreward;
+        
+        updatePlayerData(currentID, "playerStats", playerStats);
+        updatePlayerReadOnlyData(currentID, "CardsCollections", playerCollection);
+        updatePlayerReadOnlyData(currentID, "Cards", playerCards);
+        
+        return {result : playerCards, outValue : {gold : reward.goldreward, energy : reward.energyreward}};
+    }
+    
+    return {result : null};
+}
+
+function deleteCards(playerCards, collectionCards){
+    collectionCards.forEach(e => e.count -= 1);
+    
+    log.debug(playerCards);
+    
+    for(let i = 0; i < collectionCards.length; i++){
+        var index = playerCards.findIndex(e => e.name == collectionCards.name);
+        playerCards[index] = collectionCards[i];
+        
+        if(playerCards[index].count == 0){
+            playerCards.splice(index, 1);
+        }
+    }
+}
+//=======================================================
+
+//====================[Chests]===========================
+handlers.spawnChest = function(args, context){
+    var currentID = currentPlayerId;
+    var chests = getServerDataAsObject("Chests");
+    var playerChests = [];
+    var totalWeight = 0;
+    var chestID;
+    
+    try{
+        playerChests = getPlayerReadDataAsObject(currentID, "Chests");
+    }
+    catch{
+        playerChests = [];
+    }
+    
+    for(let i = 0; i < chests.length; i++){
+        totalWeight += chests[i].weight;
+    }    
+    
+    var randomNum = getRandomInt(totalWeight);
+        
+    for(let j = 0; j < chests.length; j++){
+        if(randomNum < chests[j].weight){
+            chestID = chests[j].id;
+            playerChests.push(chests[j])
+            break;
+        }
+        randomNum -= chests[j].weight;
+    }
+    
+    log.debug(playerChests);
+    
+    updatePlayerReadOnlyData(currentID, "Chests", playerChests);
+    
+    return {result : playerChests, outValue : chestID};
+}
+
+handlers.getChestWithType = function(args, context){
+    var currentID = currentPlayerId;
+    var chests = getServerDataAsObject("Chests");
+    var playerChests = [];
+    
+    try{
+        playerChests = getPlayerReadDataAsObject(currentID, "Chests");
+    }
+    catch{
+        playerChests = [];
+    }
+    
+    playerChests.push(chests.find(e => e.id == args.type));
+    
+    updatePlayerReadOnlyData(currentID, "Chests", playerChests);
+    
+    return {result : playerChests};
+}
+
+handlers.getChests = function(args, context){
+    var currentID = currentPlayerId;
+    var playerChests = [];
+    
+    try{
+        playerChests = getPlayerReadDataAsObject(currentID, "Chests");
+    }
+    catch{
+        playerChests = [];
+        updatePlayerReadOnlyData(currentID, "Chests", playerChests);
+    }
+    
+    return {result : playerChests};
+}
+
+handlers.openChest = function(args, context){
+    var currentID = currentPlayerId;
+    var cards = getServerDataAsObject("Cards");
+    
+    var chests = [];
+    var chest = {};
+    var normalCardsNumber = 0;
+    var magicalCardsNumber = 0;
+    var epicCardsNumber = 0;
+    var cardsNumber = 0;
+    
+    var playerCards = [];
+    var cardsIDs = [];
+    
+    try{
+        chests = getPlayerReadDataAsObject(currentID, "Chests");
+        chest = chests[0];
+        
+        log.debug({chest : chest});
+        
+        normalCardsNumber = chest.normalcardsnumber;
+        magicalCardsNumber = chest.magicalcardsnumber;
+        epicCardsNumber = chest.epiccardsnumber;
+        cardsNumber = chest.allcardsnumber;
+        
+        log.debug({normalCardsNumber : normalCardsNumber, magicalCardsNumber : magicalCardsNumber, epicCardsNumber : epicCardsNumber, cardsNumber : cardsNumber});
+    }
+    catch{
+        return null;
+    }
+    
+    try{
+        playerCards = getPlayerReadDataAsObject(currentID, "Cards");
+    }
+    catch{
+        playerCards = [];
+    }
+    
+    if(normalCardsNumber == 0 && magicalCardsNumber == 0 && epicCardsNumber == 0){
+        for(let i = 0; i < cardsNumber; i++){
+            cardsIDs.push(getCard(currentID, cards, playerCards));
+        }
+    }
+    else{
+        if(normalCardsNumber > 0){
+            for(let i = 0; i < normalCardsNumber; i++){
+                cardsIDs.push(getCard(currentID, cards, playerCards, "normal"));
+            }
+            
+            cardsNumber -= normalCardsNumber;
+        }
+        
+        if(magicalCardsNumber > 0){
+            for(let i = 0; i < magicalCardsNumber; i++){
+                cardsIDs.push(getCard(currentID, cards, playerCards, "magical"));
+            }
+            
+            cardsNumber -= magicalCardsNumber;
+        }
+        
+        if(epicCardsNumber > 0){
+            for(let i = 0; i < epicCardsNumber; i++){
+                cardsIDs.push(getCard(currentID, cards, playerCards, "epic"));
+            }
+            
+            cardsNumber -= epicCardsNumber;
+        }
+        
+        if(cardsNumber > 0){
+            for(let i = 0; i < cardsNumber; i++){
+                cardsIDs.push(getCard(currentID, cards, playerCards));
+            }
+        }
+    }
+    
+    chests.shift();
+    
+    log.debug(chests);
+    log.debug(playerCards);
+    
+    updatePlayerReadOnlyData(currentID, "Chests", chests);
+    updatePlayerReadOnlyData(currentID, "Cards", playerCards);
+    
+    return {result : { playerCards : playerCards, chests : chests }, outValue : cardsIDs};
+}
+//=======================================================
