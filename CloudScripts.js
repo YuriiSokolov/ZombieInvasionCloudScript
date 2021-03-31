@@ -1558,6 +1558,19 @@ handlers.getPurchase = function(args, context){
         case "energy":
             handlers.addEnergy({energyCount : thing.value});
             return {result : getPlayerDataAsObject(currentID, "energy"), outValue : "energy"};
+        case "chest":
+            switch(id){
+                case "zi_chest_normal":
+                    handlers.getChestWithType({type : "normal", count : thing.value});
+                    break;
+                case "zi_chest_magical":
+                    handlers.getChestWithType({type : "magical", count : thing.value});
+                    break;
+                case "zi_chest_epic":
+                    handlers.getChestWithType({type : "epic", count : thing.value});
+                    break;
+            }
+            return {result : getPlayerReadDataAsObject(currentID, "Chests"), outValue : "chest"};
     }
     
     return {result : null};
@@ -1889,6 +1902,7 @@ handlers.spawnChest = function(args, context){
 handlers.getChestWithType = function(args, context){
     var currentID = currentPlayerId;
     var chests = getServerDataAsObject("Chests");
+    var chest = {};
     var playerChests = [];
     
     try{
@@ -1898,7 +1912,10 @@ handlers.getChestWithType = function(args, context){
         playerChests = [];
     }
     
-    playerChests.push(chests.find(e => e.id == args.type));
+    chest = chests.find(e => e.id == args.type);
+    
+    for(let i = 0; i < args.count; i++)
+        playerChests.push(chest);
     
     updatePlayerReadOnlyData(currentID, "Chests", playerChests);
     
@@ -2003,6 +2020,6 @@ handlers.openChest = function(args, context){
     updatePlayerReadOnlyData(currentID, "Chests", chests);
     updatePlayerReadOnlyData(currentID, "Cards", playerCards);
     
-    return {result : { playerCards : playerCards, chests : chests }, outValue : cardsIDs};
+    return {result : { playerCards : playerCards, chests : chests }, outValue : { cardsIDs : cardsIDs, chestType : chest.id }};
 }
 //=======================================================
