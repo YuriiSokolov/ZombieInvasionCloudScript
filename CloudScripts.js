@@ -269,6 +269,10 @@ handlers.deletePlayerData = function (args, context){
         
     handlers.getStartEnergy();
     
+    //Cards
+    updatePlayerReadOnlyData(currentID, "Cards", null);
+    updatePlayerReadOnlyData(currentID, "CardsCollections", null);
+    
     return {result : "Done"};
 }
 
@@ -541,20 +545,23 @@ handlers.getSpinThingID = function (args, context){
                     updatePlayerStatistics(currentID, "gold", userData.coins);
                 }
                 else if(getTitleData[i].id == "energy"){
-                    //var energy = getPlayerDataAsObject(currentID, "energy");
-                    
                     if(!args || !args.isX2Spin){
-                        //energy.currentEnergy += getTitleData[i].addresourceenergy;
                         handlers.addEnergy({energyCount : getTitleData[i].addresourceenergy});
                         log.debug({addEnergy : getTitleData[i].addresourceenergy});
                     }
                     else{
-                        //energy.currentEnergy += 2 * getTitleData[i].addresourceenergy;
                         handlers.addEnergy({energyCount : 2 * getTitleData[i].addresourceenergy});
                         log.debug({addEnergy :(2 * getTitleData[i].addresourceenergy)});
                     }
-                    
-                    //updatePlayerData(currentID, "energy", energy);
+                }
+                else if(getTitleData[i].id == "normalChest"){
+                    handlers.getChestWithType({type : "normal", count : getTitleData[i].addresourcechest});
+                }
+                else if(getTitleData[i].id == "megicalChest"){
+                    handlers.getChestWithType({type : "magical", count : getTitleData[i].addresourcechest});
+                }
+                else if(getTitleData[i].id == "epicChest"){
+                    handlers.getChestWithType({type : "epic", count : getTitleData[i].addresourcechest});
                 }
                 
                 updatePlayerData(currentID, "playerStats", userData);
@@ -1815,7 +1822,7 @@ handlers.swapCollection = function(args, context){
     var collection = JSON.parse(serverData["CardsCollections"]);
     var playerCollection = getPlayerReadDataAsObject(currentID, "CardsCollections");
     var playerCards = getPlayerReadDataAsObject(currentID, "Cards");
-    var collectionID = collection.find(e => e.name == args.collection).id;
+    var collectionID = args.collection;
     
     var playerStats = getPlayerDataAsObject(currentID, "playerStats");
     
@@ -1840,7 +1847,7 @@ handlers.swapCollection = function(args, context){
         updatePlayerReadOnlyData(currentID, "CardsCollections", playerCollection);
         updatePlayerReadOnlyData(currentID, "Cards", playerCards);
         
-        return {result : playerCards, outValue : {gold : reward.goldreward, energy : reward.energyreward}};
+        return {result : { playerCards : playerCards, collection : playerCollection }, outValue : {gold : reward.goldreward, energy : reward.energyreward}};
     }
     
     return {result : null};
@@ -1904,6 +1911,7 @@ handlers.getChestWithType = function(args, context){
     var chests = getServerDataAsObject("Chests");
     var chest = {};
     var playerChests = [];
+    var count = args.count ? args.count : 1;
     
     try{
         playerChests = getPlayerReadDataAsObject(currentID, "Chests");
@@ -1914,7 +1922,7 @@ handlers.getChestWithType = function(args, context){
     
     chest = chests.find(e => e.id == args.type);
     
-    for(let i = 0; i < args.count; i++)
+    for(let i = 0; i < count; i++)
         playerChests.push(chest);
     
     updatePlayerReadOnlyData(currentID, "Chests", playerChests);
@@ -1939,7 +1947,10 @@ handlers.getChests = function(args, context){
 
 handlers.openChest = function(args, context){
     var currentID = currentPlayerId;
-    var cards = getServerDataAsObject("Cards");
+    var serverData = getServerDataAsObject(["Cards", "CardsCollections"], true);
+    var cards = JSON.parse(serverData["Cards"]);
+    var collections =  JSON.parse(serverData["CardsCollections"]);
+    var collectionsIDs = [];
     
     var chests = [];
     var chest = {};
@@ -1950,6 +1961,17 @@ handlers.openChest = function(args, context){
     
     var playerCards = [];
     var cardsIDs = [];
+    var chapters = getPlayerDataAsObject(currentID, "chapters");
+    
+    collections = collections.filter(e => e.minchapter <= chapters.currentChapter.order);
+    
+    collections.forEach(e => collectionsIDs.push(e.id));
+    
+    log.debug({ collectionsIDs : collectionsIDs });
+    
+    cards = cards.filter(e => collectionsIDs.includes(e.collectionid) == true);
+    
+    log.debug({cards : cards});
     
     try{
         chests = getPlayerReadDataAsObject(currentID, "Chests");
