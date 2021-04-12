@@ -2097,9 +2097,10 @@ handlers.loadGoldenPass = function(args, context){
         }
         
         if(!goldenPass.dayComplete){
-            if(dailyStats.gamesInDay >= 3){
+            /*if(dailyStats.gamesInDay >= 3){
                 goldenPass.canGetReward = true;
-            }
+            }*/
+            return {result : goldenPass, outValue : true};
         }
         
         updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
@@ -2132,10 +2133,10 @@ handlers.getGoldenPassReward = function(args, context){
     
     var reward = goldenPass.rewards.find(e => e.day == goldenPass.currentDay);
     
-    var dailyStats = updateDailyStats(currentID);
+    //var dailyStats = updateDailyStats(currentID);
     
     if(goldenPass.isBought){
-        if(!goldenPass.dayComplete && dailyStats.gamesInDay >= 3){
+        if(!goldenPass.dayComplete){
             goldenPass.dayComplete = true;
             goldenPass.canGetReward = false;
             updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
