@@ -1578,6 +1578,8 @@ handlers.getPurchase = function(args, context){
                     break;
             }
             return {result : getPlayerReadDataAsObject(currentID, "Chests"), outValue : "chest"};
+        case "goldenPass":
+            return {result : buyGoldenPass(currentID), outValue : "goldenPass"};
     }
     
     return {result : null};
@@ -1625,6 +1627,8 @@ handlers.checkGameResult = function(args, context){
     var playerData = getPlayerDataAsObject(currentID, ["playerStats", "chapters"], true);
     var playerStats = JSON.parse(playerData["playerStats"].Value);
     var currentChapterID = JSON.parse(playerData["chapters"].Value).currentChapter.id;
+    var dailyStats = updateDailyStats(currentID, {addGame : 1});
+    var goldenPass = handlers.loadGoldenPass({playfabID : currentID}).result;
     
     var lastGameParams = JSON.parse(server.GetUserInternalData({PlayFabId : currentID, Keys : ["lastGame"]}).Data.lastGame.Value);
     
@@ -1650,14 +1654,14 @@ handlers.checkGameResult = function(args, context){
         playerStats.coins += args.gold;
     }
     
-    //log.debug("ids : " + args.zombiesIDs);
-    //var goldFromZombies = maxGoldFromZombies(zombieTypes, zombies, args.zombiesIDs);
-    
-    //log.debug({ gold : args.gold, goldFromZombies : goldFromZombies});
+    if(dailyStats.gamesInDay >= 3){
+        goldenPass.canGetReward = true;
+        updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
+    }
     
     updatePlayerData(currentID, "playerStats", playerStats);
     
-    return {result : playerStats};
+    return {result : playerStats, outValue : goldenPass};
 }
 
 function generateZombiesTypes(zombies, max, seed){
@@ -2043,5 +2047,152 @@ handlers.openChest = function(args, context){
     updatePlayerReadOnlyData(currentID, "Cards", playerCards);
     
     return {result : { playerCards : playerCards, chests : chests }, outValue : { cardsIDs : cardsIDs, chestType : chest.id }};
+}
+//=======================================================
+
+//==================[GoldenPass]=========================
+handlers.loadGoldenPass = function(args, context){
+    var currentID = args ? args.playfabID : currentPlayerId;
+    
+    var goldenPassRewards = [];
+    
+    var goldenPass = {};
+    
+    var dailyStats = updateDailyStats(currentID);
+    
+    try{
+        goldenPass = getPlayerReadDataAsObject(currentID, "GoldenPass");
+    }
+    catch{
+        goldenPassRewards = getServerDataAsObject("GoldenPassRewards");
+        
+        goldenPass.rewards = goldenPassRewards;
+        goldenPass.currentDay = 1;
+        goldenPass.dayComplete = false;
+        goldenPass.isBought = false;
+        goldenPass.canGetReward = false;
+        
+        updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
+    }
+    
+    if(goldenPass.isBought){
+        var date = new Date();
+        date.setHours(0,0,0,0);
+        
+        var currentDay = timeSpan(date, new Date(JSON.parse(goldenPass.buyDate))).days + 1;
+        
+        if(currentDay != goldenPass.currentDay){
+            if(currentDay <= 30){
+                goldenPass.dayComplete = false;
+                goldenPass.currentDay = currentDay;
+            }
+            else{
+                goldenPassRewards = getServerDataAsObject("GoldenPassRewards");
+                goldenPass.rewards = goldenPassRewards;
+                goldenPass.currentDay = 1;
+                goldenPass.dayComplete = false;
+                goldenPass.isBought = false;
+                goldenPass.canGetReward = false;
+            }
+        }
+        
+        if(!goldenPass.dayComplete){
+            if(dailyStats.gamesInDay >= 3){
+                goldenPass.canGetReward = true;
+            }
+        }
+        
+        updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
+    }
+    
+    return {result : goldenPass};
+}
+
+function buyGoldenPass(playfabID){
+    var goldenPass = handlers.loadGoldenPass({playfabID : playfabID}).result;
+    
+    goldenPass.isBought = true;
+    
+    var buyDate = new Date();
+    buyDate.setHours(0,0,0,0);
+    
+    goldenPass.currentDay = 1;
+    goldenPass.dayComplete = false;
+    goldenPass.buyDate = JSON.stringify(buyDate);
+    
+    updatePlayerReadOnlyData(playfabID, "GoldenPass", goldenPass);
+    
+    return goldenPass;
+}
+
+handlers.getGoldenPassReward = function(args, context){
+    var currentID = currentPlayerId;
+    
+    var goldenPass = handlers.loadGoldenPass({playfabID : currentID}).result;
+    
+    var reward = goldenPass.rewards.find(e => e.day == goldenPass.currentDay);
+    
+    var dailyStats = updateDailyStats(currentID);
+    
+    if(goldenPass.isBought){
+        if(!goldenPass.dayComplete && dailyStats.gamesInDay >= 3){
+            goldenPass.dayComplete = true;
+            goldenPass.canGetReward = false;
+            updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
+        
+            switch(reward.rewardid){
+                case "gold":
+                    var playerStats = getPlayerDataAsObject(currentID, "playerStats");
+                    playerStats.coins += reward.count;
+                    updatePlayerData(currentID, "playerStats", playerStats);
+                    return {result : playerStats, outValue : goldenPass, tag : "gold"};
+                case "energy":
+                    return {result : handlers.addEnergy({energyCount : reward.count}).result, outValue : goldenPass, tag : "energy"};
+                case "normalChest":
+                    return {result : handlers.getChestWithType({type : "normal", count : thing.value}).result, outValue : goldenPass, tag : "chest"};
+                    break;
+                case "magicalChest":
+                    return {result : handlers.getChestWithType({type : "magical", count : thing.value}).result, outValue : goldenPass, tag : "chest"};
+                    break;
+                case "epicChest":
+                    return {result : handlers.getChestWithType({type : "epic", count : thing.value}).result, outValue : goldenPass, tag : "chest"};
+                    break;
+            }
+        }
+    }
+    
+    return null;
+}
+
+function updateDailyStats(playfabID, data){
+    var dailyStats = {};
+    var date = new Date();
+    date.setHours(0,0,0,0);
+    
+    try{
+        dailyStats = getPlayerDataAsObject(playfabID, "dailyStats");
+        
+        if(!dailyStats){
+            dailyStats = {date : JSON.stringify(date), gamesInDay : 0};
+        }
+    }
+    catch{
+        dailyStats = {date : JSON.stringify(date), gamesInDay : 0};
+    }
+    
+    if(timeSpan(date, new Date(JSON.parse(dailyStats.date))).days > 0){
+        dailyStats.date = JSON.stringify(date);
+        dailyStats.gamesInDay = 0;
+    }
+    
+    if(data){
+        if(data.addGame){
+            dailyStats.gamesInDay += data.addGame;
+        }
+    }
+    
+    updatePlayerData(playfabID, "dailyStats", dailyStats);
+    
+    return dailyStats;
 }
 //=======================================================
