@@ -195,7 +195,13 @@ function arrayValuesSum(array){
 }
 
 function getRandomInt(max) {
-  return Math.floor(Math.random() * Math.floor(max));
+    return Math.floor(Math.random() * Math.floor(max));
+}
+
+function getRandomIntInclusive(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function getRandomIntWithoutNumbers(numbers, max){
@@ -1398,14 +1404,15 @@ function createUpgradesList(){
 }
 
 //==========[Gifts]=========================
-function createGift(from, to, gift){
+function createGift(from, to){
     var friendGiftsData = [];
     var yourInfo = server.GetUserAccountInfo({ "PlayFabId" : from });
+    var gift = {};
     
     try{
-        friendGiftsData = getPlayerReadDataAsObject(to, "Gifts");
+        friendGiftsData = handlers.getGifts({playfabID : to}).result;
         
-        if(friendGiftsData.length > 0){
+        if(friendGiftsData.gifts.length > 0){
             gift.id = friendGiftsData[friendGiftsData.length - 1].id + 1;
         }
         else{
@@ -1414,12 +1421,11 @@ function createGift(from, to, gift){
     }
     catch{
         log.debug("Gifts not found");
-        friendGiftsData = [];
         gift.id = 0;
     }
     finally{
         gift.from = getFacebookName(yourInfo) ? getFacebookName(yourInfo) : "Anonimus";
-        friendGiftsData.push(gift);
+        friendGiftsData.gifts.push(gift);
     }
     
     updatePlayerReadOnlyData(to, "Gifts", friendGiftsData);
@@ -1428,27 +1434,27 @@ function createGift(from, to, gift){
 handlers.sendGift = function(args, context){
     var currentID = currentPlayerId;
     var friendID;
-    var gift = {};
-    var playerData = getPlayerDataAsObject(currentID, "playerStats");
+    var playerGifts = handlers.getGifts({playfabID : currentID}).result;
+    
+    log.debug(playerGifts);
     
     if(args){
+        log.debug("args");
+        log.debug(playerGifts.giftsForSendNumber);
         friendID = args.playfabID;
-        gift = args.gift;
         
-        switch(gift.type){
-            case "gold":
-                if(playerData.coins >= gift.value){
-                    playerData.coins -= gift.value;
-                    createGift(currentID, friendID, gift);
-                    updatePlayerData(currentID, "playerStats", playerData);
-                    return {result : playerData};
-                }
-                else{
-                    return null;
-                }
-            default:
-                return null;
+        if(playerGifts.giftsForSendNumber > 0 && (playerGifts.friendsWithGiftIDs.length == 0 || !playerGifts.friendsWithGiftIDs.includes(friendID))){
+            playerGifts.friendsWithGiftIDs.push(friendID);
+            playerGifts.giftsForSendNumber -= 1;
+            
+            updatePlayerReadOnlyData(currentID, "Gifts", playerGifts);
+            
+            createGift(currentID, friendID);
+            
+            return {result : playerGifts, outValue : friendID};
         }
+        
+        return {result : playerGifts, tag : "Warning"};
     }
     else{
         return null;
@@ -1456,15 +1462,30 @@ handlers.sendGift = function(args, context){
 }
 
 handlers.getGifts = function(args, context){
-    var currentID = currentPlayerId;
-    var gifts = [];
+    var currentID = args ? args.playfabID : currentPlayerId;
+    var gifts = {};
+    
+    var date = new Date();
+    date.setHours(0,0,0,0);
     
     try{
         gifts = getPlayerReadDataAsObject(currentID, "Gifts");
+        
+        var currentDay = timeSpan(date, new Date(JSON.parse(gifts.date))).days;
+        
+        if(currentDay > 0){
+            gifts.friendsWithGiftIDs = [];
+            gifts.date = JSON.stringify(date);       
+            updatePlayerReadOnlyData(currentID, "Gifts", gifts);
+        }
     }
     catch{
         log.debug("Gifts not found");
-        gifts = [];
+        gifts = {};
+        gifts.gifts = [];
+        gifts.giftsForSendNumber = 0;
+        gifts.friendsWithGiftIDs = [];
+        gifts.date = JSON.stringify(date);
         updatePlayerReadOnlyData(currentID, "Gifts", gifts);
     }
     finally{
@@ -1477,70 +1498,61 @@ handlers.openGift = function(args, context){
     var gift;
     var playerData;
     var giftsData = getPlayerReadDataAsObject(currentID, "Gifts");
+    var rewards = {};
     
-    if(args){
+    if(args && giftsData.gifts.length > 0){
         gift = args.gift;
         
-        switch(gift.type){
-            case "gold":
-                playerData = getPlayerDataAsObject(currentID, "playerStats");
-                playerData.coins += gift.value;
-                updatePlayerData(currentID, "playerStats", playerData);
-                giftsData.splice(giftsData.indexOf(giftsData.find(e => e.id == gift.id)), 1);
-                updatePlayerReadOnlyData(currentID, "Gifts", giftsData);
-                log.debug(giftsData);
-                return {result : playerData, outValue : giftsData};
-            default:
-                return null;
-        }
-    }
-    else{
-        return null;
-    }
-}
-
-handlers.openAllGifts = function(args, context){
-    var currentID = currentPlayerId;
-    var gifts = getPlayerReadDataAsObject(currentID, "Gifts");
-    var assortedGifts = {};
-    var playerStats;
-    
-    for(let i = 0; i < gifts.length; i++){
+        giftsData.gifts.splice(giftsData.gifts.indexOf(giftsData.gifts.find(e => e.id == gift.id)), 1);
+        updatePlayerReadOnlyData(currentID, "Gifts", giftsData);
+        log.debug(giftsData);
         
-        switch(gifts[i].type){
-            case "gold":
-                log.debug("gold " + gifts[i].value);
-                if(assortedGifts.gold){
-                    assortedGifts.gold += new Number(gifts[i].value);
-                }
-                else{
-                    assortedGifts.gold = new Number(gifts[i].value);
-                }
-                break;
-            default:
-                break;
+        rewards = getGiftsReward();
+        log.debug(rewards);
+        log.debug(rewards.gold);
+        log.debug(rewards.energy);
+        
+        if(rewards.gold > 0){
+            log.debug(rewards.gold);
+            playerData = getPlayerDataAsObject(currentID, "playerStats");
+            playerData.coins += rewards.gold;
+            updatePlayerData(currentID, "playerStats", playerData);
+        }
+        if(rewards.energy > 0){
+            log.debug(rewards.energy);
+            handlers.addEnergy({energyCount : rewards.energy});
+        }
+        if(rewards.normalChest > 0){
+            handlers.getChestWithType({type : "normal", count : 1});
+        }
+        if(rewards.magicalChest > 0){
+            handlers.getChestWithType({type : "magical", count : 1});
+        }
+        if(rewards.epicChest > 0){
+            handlers.getChestWithType({type : "epic", count : 1});
+        }
+        
+        return {result : giftsData, outValue : rewards};
+    }
+    else{
+        return null;
+    }
+}
+
+function getGiftsReward(){
+    var giftsRewards = getServerDataAsObject("GiftsTypes");
+    var rewards = {};
+    
+    for(let i = 0; i < giftsRewards.length; i++){
+        var currentChance = Math.random();
+        
+        if(currentChance < JSON.parse(giftsRewards[i].chance)){
+            rewards[new String(giftsRewards[i].type)] = getRandomIntInclusive(1, giftsRewards[i].maxnumber);
         }
     }
     
-    log.debug(assortedGifts);
-    
-    if(assortedGifts.gold && assortedGifts.gold > 0){
-        playerStats = getPlayerDataAsObject(currentID, "playerStats");
-        playerStats.coins += assortedGifts.gold;
-        updatePlayerData(currentID, "playerStats", playerStats);
-    }
-    
-    if(!assortedGifts){
-        return null;
-    }
-    else{
-        gifts = [];
-        updatePlayerReadOnlyData(currentID, "Gifts", gifts);
-    }
-    
-    return {result : playerStats};
+    return rewards;
 }
-
 //============[In App Purchase]==========================
 handlers.getPurchase = function(args, context){
     var currentID = currentPlayerId;
@@ -1608,7 +1620,15 @@ handlers.getMainGameParams = function(args, context){
     var maxChestsNumberInGame = getObjectInGameNumber(maxChestsNumber, chastInGameChance);
     //========================================
     
-    updatePlayerInternalData(currentID, "lastGame", {seed : seed, maxArtefactsNumber : artefactsInGame, maxChestsNumber : maxChestsNumberInGame});
+    //==========[Gifts]=======================
+    var maxGiftsNumber = gameParams.find(p => p.name == "maxGiftsNumber").value;
+    var giftInGameChance = JSON.parse(gameParams.find(p => p.name == "giftInGameChance").value);
+    var giftInZombieChance = JSON.parse(gameParams.find(p => p.name == "giftInZombieChance").value);
+    var minZombieWithGift = gameParams.find(p => p.name == "minZombieWithGift").value;
+    var maxGiftsNumberInGame = getObjectInGameNumber(maxGiftsNumber, giftInGameChance);
+    //========================================
+    
+    updatePlayerInternalData(currentID, "lastGame", {seed : seed, maxArtefactsNumber : artefactsInGame, maxChestsNumber : maxChestsNumberInGame, maxGiftsNumber : maxGiftsNumberInGame});
     
     return {result : {  
                         seed : seed, 
@@ -1618,7 +1638,11 @@ handlers.getMainGameParams = function(args, context){
                         
                         minZombieWithChest : minZombieWithChest,
                         chestInZombieChance : chestInZombieChance,
-                        maxChestsNumber : maxChestsNumberInGame
+                        maxChestsNumber : maxChestsNumberInGame,
+                        
+                        maxGiftsNumber : maxChestsNumberInGame,
+                        giftInZombieChance : giftInZombieChance,
+                        minZombieWithGift : minZombieWithGift
                      }};
 }
 
@@ -1629,6 +1653,7 @@ handlers.checkGameResult = function(args, context){
     var currentChapterID = JSON.parse(playerData["chapters"].Value).currentChapter.id;
     var dailyStats = updateDailyStats(currentID, {addGame : 1});
     var goldenPass = handlers.loadGoldenPass({playfabID : currentID}).result;
+    var gifts;
     
     var lastGameParams = JSON.parse(server.GetUserInternalData({PlayFabId : currentID, Keys : ["lastGame"]}).Data.lastGame.Value);
     
@@ -1644,7 +1669,7 @@ handlers.checkGameResult = function(args, context){
     
     log.debug({maxGold : maxGold});
 
-    if((args.artefactsNumber > lastGameParams.maxArtefactsNumber) || (args.gold > maxGold * args.energyMode) || (args.chestsNumber > lastGameParams.maxChestsNumber)){
+    if((args.artefactsNumber > lastGameParams.maxArtefactsNumber) || (args.gold > maxGold * args.energyMode) || (args.chestsNumber > lastGameParams.maxChestsNumber) || args.giftsNumber > lastGameParams.maxGiftsNumber){
         log.debug("Cheater!!!");
         banPlayer(currentID);
         
@@ -1652,11 +1677,14 @@ handlers.checkGameResult = function(args, context){
     }
     else{
         playerStats.coins += args.gold;
-    }
-    
-    if(dailyStats.gamesInDay >= 3){
-        goldenPass.canGetReward = true;
-        updatePlayerReadOnlyData(currentID, "GoldenPass", goldenPass);
+        
+        if(args.giftsNumber > 0){
+            gifts = getPlayerReadDataAsObject(currentID, "Gifts");
+            
+            gifts.giftsForSendNumber += 1;
+            
+            updatePlayerReadOnlyData(currentID, "Gifts", gifts);
+        }
     }
     
     updatePlayerData(currentID, "playerStats", playerStats);
@@ -2079,12 +2107,15 @@ handlers.loadGoldenPass = function(args, context){
         var date = new Date();
         date.setHours(0,0,0,0);
         
-        var currentDay = timeSpan(date, new Date(JSON.parse(goldenPass.buyDate))).days + 1;
+        var currentDay = timeSpan(date, new Date(JSON.parse(goldenPass.buyDate))).days;
         
-        if(currentDay != goldenPass.currentDay){
-            if(currentDay <= 30){
+        if(currentDay > 0){
+            goldenPass.buyDate = JSON.stringify(date);
+            
+            goldenPass.currentDay += 1;
+            
+            if(goldenPass.currentDay <= 30){
                 goldenPass.dayComplete = false;
-                goldenPass.currentDay = currentDay;
             }
             else{
                 goldenPassRewards = getServerDataAsObject("GoldenPassRewards");
@@ -2096,7 +2127,7 @@ handlers.loadGoldenPass = function(args, context){
             }
         }
         
-        if(!goldenPass.dayComplete){
+        if(!goldenPass.dayComplete && goldenPass.isBought){
             /*if(dailyStats.gamesInDay >= 3){
                 goldenPass.canGetReward = true;
             }*/
@@ -2133,6 +2164,10 @@ handlers.getGoldenPassReward = function(args, context){
     
     var reward = goldenPass.rewards.find(e => e.day == goldenPass.currentDay);
     
+    reward.took = true;
+    
+    goldenPass.rewards[reward.day - 1] = reward;
+    
     //var dailyStats = updateDailyStats(currentID);
     
     if(goldenPass.isBought){
@@ -2150,13 +2185,13 @@ handlers.getGoldenPassReward = function(args, context){
                 case "energy":
                     return {result : handlers.addEnergy({energyCount : reward.count}).result, outValue : goldenPass, tag : "energy"};
                 case "normalChest":
-                    return {result : handlers.getChestWithType({type : "normal", count : thing.value}).result, outValue : goldenPass, tag : "chest"};
+                    return {result : handlers.getChestWithType({type : "normal", count : reward.count}).result, outValue : goldenPass, tag : "chest"};
                     break;
                 case "magicalChest":
-                    return {result : handlers.getChestWithType({type : "magical", count : thing.value}).result, outValue : goldenPass, tag : "chest"};
+                    return {result : handlers.getChestWithType({type : "magical", count : reward.count}).result, outValue : goldenPass, tag : "chest"};
                     break;
                 case "epicChest":
-                    return {result : handlers.getChestWithType({type : "epic", count : thing.value}).result, outValue : goldenPass, tag : "chest"};
+                    return {result : handlers.getChestWithType({type : "epic", count : reward.count}).result, outValue : goldenPass, tag : "chest"};
                     break;
             }
         }
